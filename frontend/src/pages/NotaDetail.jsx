@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Printer, ArrowLeft, Building2 } from "lucide-react";
+import { Printer, ArrowLeft, Building2, Download } from "lucide-react";
+import html2pdf from "html2pdf.js";
 import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
@@ -35,6 +36,8 @@ const formatHariTanggal = (dateStr) => {
 export default function NotaDetail() {
   const { id } = useParams();
   const [nota, setNota] = useState(null);
+  const notaRef = useRef(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const load = async () => {
     const res = await request(() => api.get(E.NOTA.FULL(id)));
@@ -59,6 +62,39 @@ export default function NotaDetail() {
       )
     )
       load();
+  };
+
+  // Fungsi Export / Cetak PDF menggunakan library html2pdf
+  const handleDownloadPDF = async () => {
+    if (!notaRef.current || !nota) return;
+    setIsGeneratingPdf(true);
+
+    setTimeout(async () => {
+      try {
+        const cleanNo = (nota.nota_no || "nota").replace(/[\/\\:]/g, "_");
+        const element = notaRef.current;
+        const opt = {
+          margin: [6, 8, 6, 8],
+          filename: `Nota_${cleanNo}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            letterRendering: true,
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        };
+
+        await html2pdf().set(opt).from(element).save();
+      } catch (err) {
+        console.error("Gagal export PDF:", err);
+        alert("Gagal mengunduh PDF. Mengalihkan ke dialog cetak browser...");
+        window.print();
+      } finally {
+        setIsGeneratingPdf(false);
+      }
+    }, 150);
   };
 
   if (!nota)
@@ -91,21 +127,39 @@ export default function NotaDetail() {
               Nota {nota.nota_no}
             </h1>
             <p className="text-xs text-slate-500">
-              Isi qty & harga sesuai nota asli toko, lalu cetak atau simpan PDF.
+              Isi qty & harga sesuai nota asli toko, lalu download PDF atau cetak.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={() => window.print()}
-          className="btn-primary flex items-center justify-center gap-2 text-xs font-bold py-2.5 px-4"
-        >
-          <Printer size={16} /> Cetak / Download PDF
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Tombol Download PDF dengan library html2pdf */}
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPdf}
+            className="btn-primary flex items-center justify-center gap-2 text-xs font-bold py-2.5 px-4 shadow-sm"
+            title="Download PDF secara langsung"
+          >
+            <Download size={15} />
+            {isGeneratingPdf ? "Menyiapkan PDF..." : "Download PDF"}
+          </button>
+
+          {/* Tombol Cetak Browser */}
+          <button
+            onClick={() => window.print()}
+            className="btn-ghost flex items-center justify-center gap-2 text-xs font-semibold py-2.5 px-3.5"
+            title="Cetak langsung menggunakan printer"
+          >
+            <Printer size={15} /> Cetak
+          </button>
+        </div>
       </div>
 
       {/* Lembar Nota Kontan / Faktur Fisik */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm print:border-0 print:shadow-none print:p-0 text-slate-900 font-sans">
+      <div
+        ref={notaRef}
+        className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm print:border-0 print:shadow-none print:p-0 text-slate-900 font-sans"
+      >
         {/* Header Nota: Kiri (Kop Toko) & Kanan (Hari, Tanggal, Kepada Yth) */}
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b-2 border-[#7a2830]">
           {/* Sisi Kiri: Logo & Info Supplier */}
@@ -113,6 +167,7 @@ export default function NotaDetail() {
             {nota.logo ? (
               <img
                 src={fileUrl(nota.logo)}
+                crossOrigin="anonymous"
                 alt=""
                 className="h-16 w-16 object-contain rounded-lg border border-slate-200 p-1 shrink-0"
               />
@@ -206,39 +261,55 @@ export default function NotaDetail() {
                     {it.item_name}
                   </td>
                   <td className="py-1 px-2 text-center border-r border-[#7a2830]/30">
-                    {/* Tampilan Input di Layar */}
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.01"
-                      className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-center font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-[#7a2830] outline-none print:hidden"
-                      value={it.qty}
-                      onChange={(e) => edit(i, "qty", e.target.value)}
-                      onBlur={() => save(it)}
-                    />
-                    {/* Tampilan Cetak */}
-                    <span className="hidden print:inline font-bold">
-                      {+it.qty}
-                    </span>
+                    {/* Tampilan saat generate PDF */}
+                    {isGeneratingPdf ? (
+                      <span className="font-bold text-xs">{+it.qty}</span>
+                    ) : (
+                      <>
+                        {/* Tampilan Input di Layar */}
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-center font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-[#7a2830] outline-none print:hidden"
+                          value={it.qty}
+                          onChange={(e) => edit(i, "qty", e.target.value)}
+                          onBlur={() => save(it)}
+                        />
+                        {/* Tampilan Cetak Browser */}
+                        <span className="hidden print:inline font-bold">
+                          {+it.qty}
+                        </span>
+                      </>
+                    )}
                   </td>
                   <td className="py-1.5 px-2 text-center text-slate-600 border-r border-[#7a2830]/30">
                     {it.unit || "-"}
                   </td>
                   <td className="py-1 px-3 text-right border-r border-[#7a2830]/30">
-                    {/* Tampilan Input di Layar */}
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-[#7a2830] outline-none print:hidden"
-                      value={it.price}
-                      onChange={(e) => edit(i, "price", e.target.value)}
-                      onBlur={() => save(it)}
-                    />
-                    {/* Tampilan Cetak */}
-                    <span className="hidden print:inline font-semibold">
-                      {rupiah(it.price).replace("Rp ", "")}
-                    </span>
+                    {/* Tampilan saat generate PDF */}
+                    {isGeneratingPdf ? (
+                      <span className="font-semibold text-xs">
+                        {rupiah(it.price).replace("Rp ", "")}
+                      </span>
+                    ) : (
+                      <>
+                        {/* Tampilan Input di Layar */}
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-[#7a2830] outline-none print:hidden"
+                          value={it.price}
+                          onChange={(e) => edit(i, "price", e.target.value)}
+                          onBlur={() => save(it)}
+                        />
+                        {/* Tampilan Cetak Browser */}
+                        <span className="hidden print:inline font-semibold">
+                          {rupiah(it.price).replace("Rp ", "")}
+                        </span>
+                      </>
+                    )}
                   </td>
                   <td className="py-1.5 px-3 text-right font-black text-slate-900 whitespace-nowrap">
                     {rupiah(it.total).replace("Rp ", "")}
@@ -322,6 +393,7 @@ export default function NotaDetail() {
               {nota.signature ? (
                 <img
                   src={fileUrl(nota.signature)}
+                  crossOrigin="anonymous"
                   alt="ttd"
                   className="max-h-16 max-w-36 object-contain"
                 />
