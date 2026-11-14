@@ -65,7 +65,7 @@ export default function Login() {
           <h1 className="text-3xl font-extrabold leading-tight text-white">
             Sistem RAB, Purchase Order & Nota
           </h1>
-          
+
           <p className="text-sm text-teal-100/80 leading-relaxed">
             Pengelolaan rencana anggaran biaya harian, penerbitan PO supplier, dan rekonsiliasi nota belanja.
           </p>
@@ -214,7 +214,7 @@ export default function Login() {
           </form>
 
           {/* Quick Demo Credentials Box */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700">
+          {/* <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <p className="font-semibold text-slate-800">Akun Demo:</p>
@@ -230,7 +230,7 @@ export default function Login() {
                 Isi Otomatis
               </button>
             </div>
-          </div>
+          </div> */}
 
           <p className="text-center text-xs text-slate-400">
             &copy; {new Date().getFullYear()} RAB · PO · Nota

@@ -261,6 +261,10 @@ export default function NotaDetail() {
       const imgHeight = (canvas.height * printWidth) / canvas.width;
       const renderHeight = Math.min(imgHeight, pageHeight - margin * 2);
 
+      // Kunci background seluruh lembar kertas PDF berwarna putih murni (tidak abu-abu)
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
       pdf.addImage(imgData, "JPEG", margin, margin, printWidth, renderHeight);
       pdf.save(`Nota_${cleanNo}.pdf`);
     } catch (err) {
@@ -287,18 +291,18 @@ export default function NotaDetail() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 print:max-w-none print:m-0 print:p-0">
-      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4 & Memaksa Warna Header Tidak Transparan */}
+      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4, Background Putih Murni & Memaksa Warna Header Tidak Transparan */}
       <style>{`
         @page {
           size: A4 portrait;
           margin: 7mm 9mm 7mm 9mm;
         }
         @media print {
-          html, body {
+          html, body, #root, #root > div, main {
             background: #ffffff !important;
-            margin: 0 !important;
+            background-color: #ffffff !important;
             padding: 0 !important;
-            font-size: 11px !important;
+            margin: 0 !important;
           }
           *, *::before, *::after {
             -webkit-print-color-adjust: exact !important;
@@ -306,8 +310,11 @@ export default function NotaDetail() {
             color-adjust: exact !important;
           }
           .nota-paper {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
             box-shadow: none !important;
             border: none !important;
+            border-radius: 0 !important;
             padding: 0 !important;
             margin: 0 !important;
             width: 100% !important;
@@ -356,8 +363,8 @@ export default function NotaDetail() {
                 onClick={() => changeColor(t.colorHex)}
                 title={`${t.name} (${t.desc})`}
                 className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${currentColor.toLowerCase() === t.colorHex.toLowerCase()
-                    ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
-                    : "hover:opacity-80"
+                  ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
+                  : "hover:opacity-80"
                   }`}
                 style={{ backgroundColor: t.colorHex }}
               >
@@ -383,15 +390,15 @@ export default function NotaDetail() {
           </div>
 
           {/* Tombol Download PDF */}
-          {/* <button
+          <button
             onClick={handleDownloadPDF}
             disabled={isGeneratingPdf}
             className="btn-primary flex items-center justify-center gap-2 text-xs font-bold py-2 px-3.5 shadow-sm"
-            title="Download file PDF langsung"
+            title="Download file PDF langsung (Putih Bersih 1 Halaman)"
           >
             <Download size={15} />
             {isGeneratingPdf ? "Menyiapkan..." : "Download PDF"}
-          </button> */}
+          </button>
 
           {/* Tombol Cetak Browser */}
           <button
@@ -404,10 +411,15 @@ export default function NotaDetail() {
         </div>
       </div>
 
-      {/* Lembar Nota Kontan / Faktur Fisik */}
+      {/* Lembar Nota Kontan / Faktur Fisik (100% Putih Bersih tanpa warna abu-abu di cetak & PDF) */}
       <div
         ref={notaRef}
-        className="nota-paper rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm text-slate-900 font-sans print:border-0 print:shadow-none print:p-0 print:m-0"
+        className={`nota-paper text-slate-900 font-sans ${
+          isGeneratingPdf
+            ? "rounded-none border-0 shadow-none p-6 bg-white"
+            : "rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm"
+        } print:rounded-none print:border-0 print:shadow-none print:p-0 print:m-0 print:bg-white`}
+        style={{ backgroundColor: "#ffffff" }}
       >
         {/* Header Nota: Kiri (Kop Toko) & Kanan (Hari, Tanggal, Kepada Yth) */}
         <div

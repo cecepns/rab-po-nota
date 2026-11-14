@@ -28,8 +28,13 @@ body {
 
 /* Print Styling */
 @media print {
+  html, body, #root, #root > div, main {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
   body {
-    background: white !important;
     color: black !important;
   }
   .print-hidden {
