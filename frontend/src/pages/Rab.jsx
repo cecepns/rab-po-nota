@@ -564,7 +564,7 @@ export default function Rab() {
       {/* MODAL MULTI-ITEM INPUT RAB */}
       {batchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
+          <div className="relative w-full max-w-6xl xl:max-w-7xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
               <div className="flex items-center gap-3">
@@ -774,7 +774,7 @@ export default function Rab() {
                             <input
                               type="text"
                               placeholder="kg"
-                              className="input !py-1.5 !px-2 text-xs"
+                              className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-center font-medium focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                               value={row.unit}
                               onChange={(e) => updateBatchRow(idx, "unit", e.target.value)}
                             />
@@ -789,7 +789,7 @@ export default function Rab() {
                               step="any"
                               min="0.01"
                               required
-                              className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                              className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                               value={row.qty}
                               onChange={(e) => updateBatchRow(idx, "qty", e.target.value)}
                             />
@@ -804,7 +804,7 @@ export default function Rab() {
                               step="any"
                               min="0"
                               required
-                              className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                              className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                               value={row.price}
                               onChange={(e) => updateBatchRow(idx, "price", e.target.value)}
                             />
@@ -822,21 +822,21 @@ export default function Rab() {
                 </div>
 
                 {/* --- 2. TAMPILAN DESKTOP: TABEL MULTI-KOLOM (hidden md:block) --- */}
-                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                  <table className="w-full text-left text-sm min-w-[960px]">
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+                  <table className="w-full text-left text-sm min-w-[1100px]">
                     <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3 w-10 text-center">No</th>
-                        <th className="py-2.5 px-3 min-w-[200px]">Pelanggan / SPPG *</th>
-                        <th className="py-2.5 px-3 min-w-[220px]">
+                        <th className="py-3 px-3 w-12 text-center">No</th>
+                        <th className="py-3 px-3 min-w-[210px]">Pelanggan / SPPG *</th>
+                        <th className="py-3 px-3 min-w-[230px]">
                           Uraian / Nama Bahan *
                         </th>
-                        <th className="py-2.5 px-3 min-w-[200px]">Supplier *</th>
-                        <th className="py-2.5 px-3 w-20">Satuan</th>
-                        <th className="py-2.5 px-3 w-20">Qty *</th>
-                        <th className="py-2.5 px-3 w-28">Harga (Rp) *</th>
-                        <th className="py-2.5 px-3 w-28 text-right">Jumlah</th>
-                        <th className="py-2.5 px-2 w-16 text-center"></th>
+                        <th className="py-3 px-3 min-w-[190px]">Supplier *</th>
+                        <th className="py-3 px-2 w-24 min-w-[90px] text-center">Satuan</th>
+                        <th className="py-3 px-2 w-28 min-w-[100px] text-right">Qty *</th>
+                        <th className="py-3 px-2 w-36 min-w-[140px] text-right">Harga (Rp) *</th>
+                        <th className="py-3 px-3 w-36 min-w-[130px] text-right">Jumlah</th>
+                        <th className="py-3 px-2 w-20 min-w-[80px] text-center"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -970,11 +970,11 @@ export default function Rab() {
                             </td>
 
                             {/* Satuan */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-2 w-24 min-w-[90px]">
                               <input
                                 type="text"
                                 placeholder="kg"
-                                className="input !py-1.5 !px-2 text-xs"
+                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-center font-medium focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                                 value={row.unit}
                                 onChange={(e) =>
                                   updateBatchRow(idx, "unit", e.target.value)
@@ -983,13 +983,13 @@ export default function Rab() {
                             </td>
 
                             {/* Qty */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-2 w-28 min-w-[100px]">
                               <input
                                 type="number"
                                 step="any"
                                 min="0.01"
                                 required
-                                className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                                 value={row.qty}
                                 onChange={(e) =>
                                   updateBatchRow(idx, "qty", e.target.value)
@@ -998,13 +998,13 @@ export default function Rab() {
                             </td>
 
                             {/* Harga */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-2 w-36 min-w-[140px]">
                               <input
                                 type="number"
                                 step="any"
                                 min="0"
                                 required
-                                className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                                 value={row.price}
                                 onChange={(e) =>
                                   updateBatchRow(idx, "price", e.target.value)
@@ -1013,27 +1013,27 @@ export default function Rab() {
                             </td>
 
                             {/* Jumlah */}
-                            <td className="py-2.5 px-3 text-right font-black text-slate-800 text-xs">
+                            <td className="py-2.5 px-3 w-36 min-w-[130px] text-right font-black text-slate-800 text-xs">
                               {rupiah(lineTotal)}
                             </td>
 
                             {/* Tombol Salin & Hapus Baris */}
-                            <td className="py-2 px-2 text-center">
+                            <td className="py-2 px-2 w-20 min-w-[80px] text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   type="button"
                                   onClick={() => duplicateBatchRow(idx)}
                                   title="Salin baris ini"
-                                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-teal-700 transition"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-teal-700 transition"
                                 >
-                                  <Copy size={13} />
+                                  <Copy size={14} />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => removeBatchRow(idx)}
                                   disabled={batchItems.length <= 1}
                                   title="Hapus baris"
-                                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${batchItems.length <= 1
+                                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition ${batchItems.length <= 1
                                       ? "opacity-30 cursor-not-allowed"
                                       : "hover:bg-rose-50 hover:text-rose-600"
                                     }`}

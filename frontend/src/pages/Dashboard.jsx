@@ -28,33 +28,33 @@ import { rupiah, today } from "@/utils/format";
 const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, trendType }) => {
   const colorMap = {
     teal: {
-      border: "border-teal-100 hover:border-teal-300",
-      iconBg: "bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/20",
+      border: "border-teal-100 hover:border-teal-200",
+      iconBox: "bg-teal-600 text-white shadow-sm shadow-teal-600/30",
       subText: "text-slate-500",
     },
     blue: {
-      border: "border-sky-100 hover:border-sky-300",
-      iconBg: "bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20",
+      border: "border-sky-100 hover:border-sky-200",
+      iconBox: "bg-sky-600 text-white shadow-sm shadow-sky-600/30",
       subText: "text-slate-500",
     },
     purple: {
-      border: "border-purple-100 hover:border-purple-300",
-      iconBg: "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/20",
+      border: "border-purple-100 hover:border-purple-200",
+      iconBox: "bg-purple-600 text-white shadow-sm shadow-purple-600/30",
       subText: "text-slate-500",
     },
     emerald: {
-      border: "border-emerald-100 hover:border-emerald-300",
-      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20",
+      border: "border-emerald-100 hover:border-emerald-200",
+      iconBox: "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30",
       subText: "text-emerald-700",
     },
     rose: {
-      border: "border-rose-100 hover:border-rose-300",
-      iconBg: "bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/20",
+      border: "border-rose-100 hover:border-rose-200",
+      iconBox: "bg-rose-600 text-white shadow-sm shadow-rose-600/30",
       subText: "text-rose-700",
     },
     slate: {
       border: "border-slate-200 hover:border-slate-300",
-      iconBg: "bg-gradient-to-br from-slate-600 to-slate-700 text-white shadow-md shadow-slate-500/20",
+      iconBox: "bg-slate-700 text-white shadow-sm shadow-slate-700/30",
       subText: "text-slate-500",
     },
   };
@@ -65,26 +65,28 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, trendType 
     <div
       className={`relative flex flex-col justify-between rounded-2xl border ${scheme.border} bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1 min-w-0 flex-1 pr-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            {title}
-          </p>
-          <p className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 truncate" title={value}>
-            {value}
-          </p>
-        </div>
-
-        {/* Icon box berukuran proporsional yang TIDAK AKAN PERNAH terdistorsi / stretch */}
+      {/* Header Card: Judul di kiri, Icon proporsional di kanan */}
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          {title}
+        </p>
         <div
-          className={`flex h-12 w-12 min-w-[48px] min-h-[48px] shrink-0 aspect-square items-center justify-center rounded-2xl ${scheme.iconBg}`}
+          className={`flex h-10 w-10 min-w-[40px] min-h-[40px] shrink-0 aspect-square items-center justify-center rounded-xl ${scheme.iconBox}`}
         >
-          <Icon size={22} className="shrink-0" />
+          <Icon size={19} className="shrink-0" />
         </div>
       </div>
 
+      {/* Nilai Utama: Mendapatkan 100% lebar tanpa terganggu/terdesak icon */}
+      <div className="my-1">
+        <p className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 break-words">
+          {value}
+        </p>
+      </div>
+
+      {/* Footer Card: Subtitle & Status Trend */}
       {(subtitle || trend) && (
-        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
           <span className={`font-semibold ${scheme.subText}`}>{subtitle}</span>
           {trend && (
             <span
@@ -254,8 +256,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4 Stat Cards dengan Lucide Icons */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 4 Stat Cards dengan Layout 2 Kolom (Spacious & Angka Tidak Terpotong) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-5">
         <StatCard
           title="Total Nilai RAB"
           value={rupiah(rabTotal)}
