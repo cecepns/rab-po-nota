@@ -1,74 +1,122 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Printer, ArrowLeft, Building2, Download, Palette } from "lucide-react";
+import { Printer, ArrowLeft, Building2, Download, Palette, Pipette } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
 import { fileUrl, rupiah } from "@/utils/format";
 
-// Pilihan tema warna nota (Default: Hitam/Slate Netral yang universal untuk semua toko)
-const NOTA_THEMES = {
-  slate: {
-    id: "slate",
-    name: "Hitam Netral",
-    colorHex: "#1e293b",
-    textClass: "text-slate-900",
-    headerBg: "bg-slate-900",
-    headerText: "text-white",
-    borderColor: "border-slate-300",
-    borderHeader: "border-slate-900",
-    bankBox: "border-2 border-slate-900 bg-slate-50/80 text-slate-900",
-    bankTitle: "text-slate-700",
-    bankRek: "text-slate-900",
-    totalBoxHeader: "bg-slate-100 border-slate-300",
-    totalText: "text-slate-900",
+// Preset tema warna nota asli berdasarkan bukti fisik toko / sembako / daging
+export const THEME_PRESETS = [
+  {
+    id: "green",
+    name: "Hijau Toko",
+    colorHex: "#23943d",
+    desc: "Toko Rangga / Sayuran & Sembako",
   },
-  navy: {
-    id: "navy",
-    name: "Biru Toko",
-    colorHex: "#1e3a8a",
-    textClass: "text-blue-950",
-    headerBg: "bg-blue-900",
-    headerText: "text-white",
-    borderColor: "border-blue-200",
-    borderHeader: "border-blue-900",
-    bankBox: "border-2 border-blue-900 bg-blue-50/40 text-blue-950",
-    bankTitle: "text-blue-800",
-    bankRek: "text-blue-900",
-    totalBoxHeader: "bg-blue-50 border-blue-200",
-    totalText: "text-blue-900",
+  {
+    id: "orange",
+    name: "Oranye Sembako",
+    colorHex: "#e07a1e",
+    desc: "Toko Farsyha Kencana",
   },
-  teal: {
-    id: "teal",
-    name: "Hijau Pangan",
-    colorHex: "#0f766e",
-    textClass: "text-teal-950",
-    headerBg: "bg-teal-800",
-    headerText: "text-white",
-    borderColor: "border-teal-200",
-    borderHeader: "border-teal-800",
-    bankBox: "border-2 border-teal-800 bg-teal-50/40 text-teal-950",
-    bankTitle: "text-teal-800",
-    bankRek: "text-teal-900",
-    totalBoxHeader: "bg-teal-50 border-teal-200",
-    totalText: "text-teal-900",
+  {
+    id: "terracotta",
+    name: "Cokelat Bata",
+    colorHex: "#b05246",
+    desc: "Tahu Gemoy",
   },
-  maroon: {
+  {
+    id: "coral",
+    name: "Merah Bata",
+    colorHex: "#be4b55",
+    desc: "Toko Gemoy",
+  },
+  {
     id: "maroon",
     name: "Merah Marun",
     colorHex: "#7a2830",
-    textClass: "text-[#7a2830]",
-    headerBg: "bg-[#7a2830]",
-    headerText: "text-white",
-    borderColor: "border-[#7a2830]/30",
-    borderHeader: "border-[#7a2830]",
-    bankBox: "border-2 border-[#7a2830] bg-rose-50/30 text-slate-900",
-    bankTitle: "text-[#7a2830]",
-    bankRek: "text-[#7a2830]",
-    totalBoxHeader: "bg-[#7a2830]/10 border-[#7a2830]/30",
-    totalText: "text-[#7a2830]",
+    desc: "Sumber Daging",
   },
+  {
+    id: "navy",
+    name: "Biru Faktur",
+    colorHex: "#1e40af",
+    desc: "Toko Bahan Bangunan / Elektronik",
+  },
+  {
+    id: "slate",
+    name: "Hitam Netral",
+    colorHex: "#1e293b",
+    desc: "Standar Universal",
+  },
+];
+
+// Helper kalkulasi tema warna dinamis dengan inline style agar tahan cetak browser & html2pdf
+const getTheme = (colorHex = "#1e293b") => {
+  const hex = colorHex || "#1e293b";
+  return {
+    colorHex: hex,
+    text: { color: hex },
+    headerTr: {
+      backgroundColor: hex,
+      color: "#ffffff",
+      WebkitPrintColorAdjust: "exact",
+      printColorAdjust: "exact",
+    },
+    headerTh: {
+      backgroundColor: hex,
+      color: "#ffffff",
+      borderColor: "rgba(255, 255, 255, 0.3)",
+      WebkitPrintColorAdjust: "exact",
+      printColorAdjust: "exact",
+    },
+    borderSolid: {
+      borderColor: hex,
+    },
+    borderGrid: {
+      borderColor: `${hex}55`, // ~33% opacity untuk grid tabel
+    },
+    bankBox: {
+      borderColor: hex,
+      backgroundColor: `${hex}0a`, // 4% tint
+      color: "#0f172a",
+      WebkitPrintColorAdjust: "exact",
+      printColorAdjust: "exact",
+    },
+    bankTitle: {
+      color: hex,
+    },
+    totalHeader: {
+      backgroundColor: `${hex}14`, // 8% tint
+      borderColor: `${hex}45`,
+      WebkitPrintColorAdjust: "exact",
+      printColorAdjust: "exact",
+    },
+    totalText: {
+      color: hex,
+    },
+  };
+};
+
+// Helper konversi URL gambar ke Base64 Data URL agar html2canvas tidak error kena CORS / tainted canvas
+const toDataUrl = async (url) => {
+  if (!url) return null;
+  if (url.startsWith("data:")) return url;
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) return url;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(url);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
 };
 
 // Format Hari, Tanggal (Contoh: "Rabu, 11/11/2026")
@@ -102,11 +150,22 @@ export default function NotaDetail() {
   const [nota, setNota] = useState(null);
   const notaRef = useRef(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [themeKey, setThemeKey] = useState("slate");
+  const [currentColor, setCurrentColor] = useState("#1e293b");
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [sigDataUrl, setSigDataUrl] = useState(null);
 
   const load = async () => {
     const res = await request(() => api.get(E.NOTA.FULL(id)));
-    if (res) setNota(res.data);
+    if (res?.data) {
+      setNota(res.data);
+      // Preload gambar ke Base64 Data URL untuk html2pdf yang anti-error
+      if (res.data.logo) {
+        toDataUrl(fileUrl(res.data.logo)).then((d) => setLogoDataUrl(d));
+      }
+      if (res.data.signature) {
+        toDataUrl(fileUrl(res.data.signature)).then((d) => setSigDataUrl(d));
+      }
+    }
   };
 
   useEffect(() => {
@@ -116,23 +175,35 @@ export default function NotaDetail() {
   // Ingat preferensi tema warna per supplier di browser
   useEffect(() => {
     if (nota?.supplier_id) {
-      const savedTheme = localStorage.getItem(`nota_theme_${nota.supplier_id}`);
-      if (savedTheme && NOTA_THEMES[savedTheme]) {
-        setThemeKey(savedTheme);
+      const savedColor = localStorage.getItem(`nota_color_${nota.supplier_id}`);
+      if (savedColor) {
+        setCurrentColor(savedColor);
       } else {
-        setThemeKey("slate"); // Default universal: Hitam Netral
+        // Cek nama supplier untuk saran warna bawaan jika belum pernah diatur
+        const sName = (nota.supplier_name || "").toLowerCase();
+        if (sName.includes("rangga") || sName.includes("sayur")) {
+          setCurrentColor("#23943d"); // Hijau
+        } else if (sName.includes("farsyha") || sName.includes("sembako")) {
+          setCurrentColor("#e07a1e"); // Oranye
+        } else if (sName.includes("gemoy") || sName.includes("tahu")) {
+          setCurrentColor("#b05246"); // Terakota
+        } else if (sName.includes("daging")) {
+          setCurrentColor("#7a2830"); // Marun
+        } else {
+          setCurrentColor("#1e293b"); // Default Netral
+        }
       }
     }
-  }, [nota?.supplier_id]);
+  }, [nota?.supplier_id, nota?.supplier_name]);
 
-  const changeTheme = (key) => {
-    setThemeKey(key);
+  const changeColor = (hex) => {
+    setCurrentColor(hex);
     if (nota?.supplier_id) {
-      localStorage.setItem(`nota_theme_${nota.supplier_id}`, key);
+      localStorage.setItem(`nota_color_${nota.supplier_id}`, hex);
     }
   };
 
-  const theme = NOTA_THEMES[themeKey] || NOTA_THEMES.slate;
+  const theme = getTheme(currentColor);
 
   const edit = (i, k, v) =>
     setNota({
@@ -150,15 +221,28 @@ export default function NotaDetail() {
       load();
   };
 
-  // Fungsi Export / Download PDF menggunakan library html2pdf
+  // Fungsi Export / Download PDF menggunakan html2pdf dengan penanganan error lengkap
   const handleDownloadPDF = async () => {
     if (!notaRef.current || !nota) return;
     setIsGeneratingPdf(true);
 
+    // Beri jeda kecil agar React render state preview tanpa input
     setTimeout(async () => {
       try {
+        let pdfFn = html2pdf;
+        if (typeof pdfFn !== "function" && pdfFn?.default) {
+          pdfFn = pdfFn.default;
+        }
+        if (typeof pdfFn !== "function" && window.html2pdf) {
+          pdfFn = window.html2pdf;
+        }
+        if (typeof pdfFn !== "function") {
+          throw new Error("Modul html2pdf tidak tersedia.");
+        }
+
         const cleanNo = (nota.nota_no || "nota").replace(/[\/\\:]/g, "_");
         const element = notaRef.current;
+
         const opt = {
           margin: [6, 8, 6, 8],
           filename: `Nota_${cleanNo}.pdf`,
@@ -166,21 +250,30 @@ export default function NotaDetail() {
           html2canvas: {
             scale: 2,
             useCORS: true,
+            allowTaint: true,
             logging: false,
-            letterRendering: true,
+            scrollY: 0,
+            scrollX: 0,
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
         };
 
-        await html2pdf().set(opt).from(element).save();
+        await pdfFn().set(opt).from(element).save();
       } catch (err) {
-        console.error("Gagal export PDF:", err);
-        alert("Gagal mengunduh PDF. Mengalihkan ke dialog cetak browser...");
-        window.print();
+        console.error("Gagal export PDF html2pdf:", err);
+        // Fallback langsung buka Cetak Browser (di mana sudah kita buat 1 halaman pas & warna solid)
+        if (
+          confirm(
+            "Pembuatan PDF otomatis sedang terhalang sistem browser. Buka Cetak Browser untuk 'Simpan sebagai PDF' (1 halaman rapi & warna pas)?"
+          )
+        ) {
+          window.print();
+        }
       } finally {
         setIsGeneratingPdf(false);
       }
-    }, 150);
+    }, 120);
   };
 
   if (!nota)
@@ -192,13 +285,49 @@ export default function NotaDetail() {
 
   const total = nota.items.reduce((s, x) => s + +x.total, 0);
 
-  // Jumlah baris minimal agar tampilan menyerupai buku nota fisik asli
-  const minRows = 8;
+  // Jumlah baris minimal 5 agar pas 1 halaman A4 dan tidak tumpah ke page 2
+  const minRows = 5;
   const emptyRowsCount = Math.max(0, minRows - (nota.items?.length || 0));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 print:max-w-none print:m-0 print:p-0">
-      {/* Top Action Bar (Hanya tampil di layar, tersembunyi saat cetak) */}
+    <div className="mx-auto max-w-4xl space-y-4 print:max-w-none print:m-0 print:p-0">
+      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4 & Memaksa Warna Header Tidak Transparan */}
+      <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 7mm 9mm 7mm 9mm;
+        }
+        @media print {
+          html, body {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 11px !important;
+          }
+          *, *::before, *::after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          .nota-paper {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .signature-block {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            page-break-after: avoid !important;
+          }
+        }
+      `}</style>
+
+      {/* Top Action Bar (Hanya tampil di layar monitor) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-3">
           <Link
@@ -213,44 +342,57 @@ export default function NotaDetail() {
               Nota {nota.nota_no}
             </h1>
             <p className="text-xs text-slate-500">
-              Isi qty & harga sesuai nota asli toko, lalu download PDF atau cetak.
+              Sesuaikan warna nota toko, lalu download PDF atau cetak 1 halaman.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Pilihan Warna Tema Nota (Dapat disesuaikan per toko) */}
+          {/* Pilihan Warna Tema Nota Sesuai Nota Fisik */}
           <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
             <span className="text-[11px] font-semibold text-slate-500 pl-1.5 pr-0.5 flex items-center gap-1">
-              <Palette size={13} /> Tema:
+              <Palette size={13} /> Warna:
             </span>
-            {Object.values(NOTA_THEMES).map((t) => (
+            {THEME_PRESETS.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => changeTheme(t.id)}
-                title={t.name}
-                className={`flex h-6 items-center gap-1 rounded-lg px-2 text-[11px] font-bold transition ${
-                  themeKey === t.id
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100"
+                onClick={() => changeColor(t.colorHex)}
+                title={`${t.name} (${t.desc})`}
+                className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${
+                  currentColor.toLowerCase() === t.colorHex.toLowerCase()
+                    ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
+                    : "hover:opacity-80"
                 }`}
+                style={{ backgroundColor: t.colorHex }}
               >
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: t.colorHex }}
-                />
-                <span className="hidden md:inline">{t.name}</span>
+                {currentColor.toLowerCase() === t.colorHex.toLowerCase() && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                )}
               </button>
             ))}
+
+            {/* Color Picker Kustom Bebas */}
+            <label
+              title="Pilih Warna Bebas (Color Picker)"
+              className="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 transition"
+            >
+              <Pipette size={12} className="text-slate-700" />
+              <input
+                type="color"
+                value={currentColor}
+                onChange={(e) => changeColor(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </label>
           </div>
 
-          {/* Tombol Download PDF dengan library html2pdf */}
+          {/* Tombol Download PDF */}
           <button
             onClick={handleDownloadPDF}
             disabled={isGeneratingPdf}
             className="btn-primary flex items-center justify-center gap-2 text-xs font-bold py-2 px-3.5 shadow-sm"
-            title="Download PDF secara langsung"
+            title="Download file PDF langsung"
           >
             <Download size={15} />
             {isGeneratingPdf ? "Menyiapkan..." : "Download PDF"}
@@ -260,7 +402,7 @@ export default function NotaDetail() {
           <button
             onClick={() => window.print()}
             className="btn-ghost flex items-center justify-center gap-2 text-xs font-semibold py-2 px-3"
-            title="Cetak langsung menggunakan printer"
+            title="Cetak langsung ke printer atau Simpan PDF (1 Halaman Pas)"
           >
             <Printer size={15} /> Cetak
           </button>
@@ -270,20 +412,21 @@ export default function NotaDetail() {
       {/* Lembar Nota Kontan / Faktur Fisik */}
       <div
         ref={notaRef}
-        className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm print:border-0 print:shadow-none print:p-0 text-slate-900 font-sans"
+        className="nota-paper rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm text-slate-900 font-sans print:border-0 print:shadow-none print:p-0 print:m-0"
       >
         {/* Header Nota: Kiri (Kop Toko) & Kanan (Hari, Tanggal, Kepada Yth) */}
         <div
-          className={`flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b-2 ${theme.borderHeader}`}
+          className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b-2"
+          style={theme.borderSolid}
         >
-          {/* Sisi Kiri: Logo & Info Supplier */}
+          {/* Sisi Kiri: Logo & Info Toko */}
           <div className="flex items-start gap-3.5 flex-1 min-w-0">
             {nota.logo ? (
               <img
-                src={fileUrl(nota.logo)}
+                src={logoDataUrl || fileUrl(nota.logo)}
                 crossOrigin="anonymous"
                 alt=""
-                className="h-16 w-16 object-contain rounded-lg border border-slate-200 p-1 shrink-0"
+                className="h-14 w-14 object-contain rounded-lg border border-slate-200 p-1 shrink-0"
               />
             ) : (
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-800 shrink-0">
@@ -292,7 +435,8 @@ export default function NotaDetail() {
             )}
             <div className="space-y-0.5 min-w-0">
               <h2
-                className={`text-xl sm:text-2xl font-black uppercase tracking-tight ${theme.textClass}`}
+                className="text-xl sm:text-2xl font-black uppercase tracking-tight"
+                style={theme.text}
               >
                 {nota.supplier_name}
               </h2>
@@ -336,10 +480,11 @@ export default function NotaDetail() {
 
         {/* Baris Nomor Nota & Ref PO */}
         <div
-          className={`flex items-center justify-between text-xs py-2 border-b ${theme.borderColor} font-semibold text-slate-700`}
+          className="flex items-center justify-between text-xs py-2 border-b font-semibold text-slate-700"
+          style={theme.borderGrid}
         >
           <div>
-            Nota No. : <b className={`${theme.textClass} font-bold`}>{nota.nota_no}</b>
+            Nota No. : <b style={theme.text}>{nota.nota_no}</b>
           </div>
           {nota.po_no && (
             <div className="text-slate-500">
@@ -349,24 +494,31 @@ export default function NotaDetail() {
         </div>
 
         {/* Tabel Rincian Barang dengan Garis Kotak Khas Nota Fisik */}
-        <div className="overflow-x-auto mt-3">
+        <div className="overflow-x-auto mt-2">
           <table
-            className={`w-full text-xs border-collapse border ${theme.borderColor} min-w-[550px] print:min-w-full`}
+            className="w-full text-xs border-collapse border min-w-[550px] print:min-w-full"
+            style={theme.borderSolid}
           >
             <thead>
-              <tr
-                className={`${theme.headerBg} ${theme.headerText} font-bold text-center border-b ${theme.borderHeader}`}
-              >
-                <th className="py-2 px-2 w-10 border-r border-white/20">No.</th>
-                <th className="py-2 px-3 text-left border-r border-white/20">
+              <tr style={theme.headerTr} className="font-bold text-center">
+                <th style={theme.headerTh} className="py-2 px-2 w-10 border-r">
+                  No.
+                </th>
+                <th style={theme.headerTh} className="py-2 px-3 text-left border-r">
                   Nama Barang
                 </th>
-                <th className="py-2 px-2 w-20 border-r border-white/20">Qty</th>
-                <th className="py-2 px-2 w-16 border-r border-white/20">Sat</th>
-                <th className="py-2 px-3 w-32 text-right border-r border-white/20">
+                <th style={theme.headerTh} className="py-2 px-2 w-20 border-r">
+                  Qty
+                </th>
+                <th style={theme.headerTh} className="py-2 px-2 w-16 border-r">
+                  Sat
+                </th>
+                <th style={theme.headerTh} className="py-2 px-3 w-32 text-right border-r">
                   Harga Satuan (Rp.)
                 </th>
-                <th className="py-2 px-3 w-36 text-right">Jumlah (Rp.)</th>
+                <th style={theme.headerTh} className="py-2 px-3 w-36 text-right">
+                  Jumlah (Rp.)
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -374,37 +526,38 @@ export default function NotaDetail() {
               {nota.items.map((it, i) => (
                 <tr
                   key={it.id}
-                  className={`border-b ${theme.borderColor} hover:bg-slate-50/50`}
+                  className="border-b hover:bg-slate-50/50"
+                  style={theme.borderGrid}
                 >
                   <td
-                    className={`py-1.5 px-2 text-center text-slate-500 border-r ${theme.borderColor} font-medium`}
+                    className="py-1.5 px-2 text-center text-slate-500 border-r font-medium"
+                    style={theme.borderGrid}
                   >
                     {i + 1}
                   </td>
                   <td
-                    className={`py-1.5 px-3 font-bold text-slate-900 border-r ${theme.borderColor}`}
+                    className="py-1.5 px-3 font-bold text-slate-900 border-r"
+                    style={theme.borderGrid}
                   >
                     {it.item_name}
                   </td>
                   <td
-                    className={`py-1 px-2 text-center border-r ${theme.borderColor}`}
+                    className="py-1 px-2 text-center border-r"
+                    style={theme.borderGrid}
                   >
-                    {/* Tampilan saat generate PDF */}
                     {isGeneratingPdf ? (
                       <span className="font-bold text-xs">{+it.qty}</span>
                     ) : (
                       <>
-                        {/* Tampilan Input di Layar */}
                         <input
                           type="number"
                           step="any"
                           min="0.01"
-                          className={`w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-center font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:${theme.borderHeader} outline-none print:hidden`}
+                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-center font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-slate-800 outline-none print:hidden"
                           value={it.qty}
                           onChange={(e) => edit(i, "qty", e.target.value)}
                           onBlur={() => save(it)}
                         />
-                        {/* Tampilan Cetak Browser */}
                         <span className="hidden print:inline font-bold">
                           {+it.qty}
                         </span>
@@ -412,31 +565,30 @@ export default function NotaDetail() {
                     )}
                   </td>
                   <td
-                    className={`py-1.5 px-2 text-center text-slate-600 border-r ${theme.borderColor}`}
+                    className="py-1.5 px-2 text-center text-slate-600 border-r"
+                    style={theme.borderGrid}
                   >
                     {it.unit || "-"}
                   </td>
                   <td
-                    className={`py-1 px-3 text-right border-r ${theme.borderColor}`}
+                    className="py-1 px-3 text-right border-r"
+                    style={theme.borderGrid}
                   >
-                    {/* Tampilan saat generate PDF */}
                     {isGeneratingPdf ? (
                       <span className="font-semibold text-xs">
                         {rupiah(it.price).replace("Rp ", "")}
                       </span>
                     ) : (
                       <>
-                        {/* Tampilan Input di Layar */}
                         <input
                           type="number"
                           step="any"
                           min="0"
-                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none print:hidden"
+                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-slate-800 outline-none print:hidden"
                           value={it.price}
                           onChange={(e) => edit(i, "price", e.target.value)}
                           onBlur={() => save(it)}
                         />
-                        {/* Tampilan Cetak Browser */}
                         <span className="hidden print:inline font-semibold">
                           {rupiah(it.price).replace("Rp ", "")}
                         </span>
@@ -453,13 +605,14 @@ export default function NotaDetail() {
               {Array.from({ length: emptyRowsCount }).map((_, idx) => (
                 <tr
                   key={`empty-${idx}`}
-                  className={`border-b ${theme.borderColor} h-7`}
+                  className="border-b h-6 print:h-5"
+                  style={theme.borderGrid}
                 >
-                  <td className={`border-r ${theme.borderColor}`}></td>
-                  <td className={`border-r ${theme.borderColor}`}></td>
-                  <td className={`border-r ${theme.borderColor}`}></td>
-                  <td className={`border-r ${theme.borderColor}`}></td>
-                  <td className={`border-r ${theme.borderColor}`}></td>
+                  <td className="border-r" style={theme.borderGrid}></td>
+                  <td className="border-r" style={theme.borderGrid}></td>
+                  <td className="border-r" style={theme.borderGrid}></td>
+                  <td className="border-r" style={theme.borderGrid}></td>
+                  <td className="border-r" style={theme.borderGrid}></td>
                   <td></td>
                 </tr>
               ))}
@@ -468,21 +621,26 @@ export default function NotaDetail() {
         </div>
 
         {/* Bagian Bawah: Box Rekening Bank (Kiri) & Rincian Total (Kanan) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2.5 pt-1.5">
           {/* Kolom Kiri: Kotak Pembayaran Rekening Bank */}
-          <div className="space-y-4">
-            <div className={`rounded-lg ${theme.bankBox} p-3 max-w-sm text-xs`}>
+          <div className="space-y-2">
+            <div
+              className="rounded-lg border-2 p-2.5 max-w-sm text-xs"
+              style={theme.bankBox}
+            >
               <div
-                className={`font-bold ${theme.bankTitle} uppercase text-[10px] tracking-wider mb-1`}
+                className="font-bold uppercase text-[10px] tracking-wider mb-0.5"
+                style={theme.bankTitle}
               >
                 Pembayaran Via Transfer Bank :
               </div>
-              <div className="font-extrabold text-sm text-slate-900">
+              <div className="font-extrabold text-xs sm:text-sm text-slate-900">
                 {nota.bank_name ? nota.bank_name.toUpperCase() : "BANK"} A/N.{" "}
                 {nota.bank_account_name || nota.pic_name || nota.supplier_name}
               </div>
               <div
-                className={`text-xs font-black ${theme.bankRek} mt-0.5 tracking-wide`}
+                className="text-xs font-black mt-0.5 tracking-wide"
+                style={theme.text}
               >
                 No. Rek {nota.bank_account_no || "-"}
               </div>
@@ -490,25 +648,28 @@ export default function NotaDetail() {
           </div>
 
           {/* Kolom Kanan: Rincian Jumlah, DP, Sisa & Terima Kasih */}
-          <div className="flex flex-col items-end justify-between space-y-2">
+          <div className="flex flex-col items-end justify-between space-y-1.5">
             <div
-              className={`w-full sm:w-64 border ${theme.borderColor} rounded-lg overflow-hidden text-xs`}
+              className="w-full sm:w-64 border rounded-lg overflow-hidden text-xs"
+              style={theme.borderGrid}
             >
               <div
-                className={`flex justify-between items-center py-2 px-3 ${theme.totalBoxHeader} border-b ${theme.borderColor} font-bold`}
+                className="flex justify-between items-center py-1.5 px-3 border-b font-bold"
+                style={theme.totalHeader}
               >
                 <span className="text-slate-700">Jumlah Rp.</span>
-                <span className={`text-sm font-black ${theme.totalText}`}>
+                <span className="text-sm font-black" style={theme.totalText}>
                   {rupiah(total)}
                 </span>
               </div>
               <div
-                className={`flex justify-between items-center py-1.5 px-3 border-b ${theme.borderColor} text-slate-600`}
+                className="flex justify-between items-center py-1 px-3 border-b text-slate-600"
+                style={theme.borderGrid}
               >
                 <span>DP Rp.</span>
                 <span className="font-medium">-</span>
               </div>
-              <div className="flex justify-between items-center py-1.5 px-3 text-slate-600">
+              <div className="flex justify-between items-center py-1 px-3 text-slate-600">
                 <span>Sisa Rp.</span>
                 <span className="font-medium">-</span>
               </div>
@@ -521,30 +682,30 @@ export default function NotaDetail() {
         </div>
 
         {/* Blok Tanda Tangan: Tanda Terima (Kiri) & Hormat Kami (Kanan) */}
-        <div className="flex justify-between items-end mt-8 pt-4 text-xs font-semibold">
+        <div className="signature-block flex justify-between items-end mt-4 pt-2 print:mt-2 print:pt-1 text-xs font-semibold">
           {/* Tanda Terima (Penerima) */}
-          <div className="text-center w-48">
-            <p className="text-slate-800 font-bold mb-16">Tanda Terima,</p>
-            <div className="border-b border-dotted border-slate-700 mx-auto w-36" />
+          <div className="text-center w-44">
+            <p className="text-slate-800 font-bold mb-10 print:mb-7">Tanda Terima,</p>
+            <div className="border-b border-dotted border-slate-700 mx-auto w-32" />
           </div>
 
           {/* Hormat Kami (Toko / Supplier) */}
-          <div className="text-center w-52">
+          <div className="text-center w-48">
             <p className="text-slate-800 font-bold">Hormat Kami,</p>
-            <div className="h-16 flex items-center justify-center my-1">
+            <div className="h-12 print:h-10 flex items-center justify-center my-0.5">
               {nota.signature ? (
                 <img
-                  src={fileUrl(nota.signature)}
+                  src={sigDataUrl || fileUrl(nota.signature)}
                   crossOrigin="anonymous"
                   alt="ttd"
-                  className="max-h-16 max-w-36 object-contain"
+                  className="max-h-12 print:max-h-9 max-w-32 object-contain"
                 />
               ) : (
-                <div className="h-16" />
+                <div className="h-12 print:h-10" />
               )}
             </div>
-            <div className="border-b border-dotted border-slate-700 mx-auto w-40" />
-            <p className="text-[11px] font-bold text-slate-900 mt-1 uppercase">
+            <div className="border-b border-dotted border-slate-700 mx-auto w-36" />
+            <p className="text-[11px] font-bold text-slate-900 mt-0.5 uppercase">
               {nota.supplier_name}
             </p>
           </div>

@@ -63,17 +63,7 @@ const upload = multer({
 
 const app = express();
 app.use(cors(), express.json(), express.urlencoded({ extended: true }));
-app.use(
-  '/uploads',
-  cors(),
-  express.static(UPLOAD_DIR, {
-    setHeaders: (res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    },
-  })
-);
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 // ---------- helpers ----------
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
@@ -522,7 +512,8 @@ app.get(
   wrap(async (req, res) => {
     const [[nota]] = await db.query(
       `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no,
-        (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_name
+        (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_name,
+        (SELECT GROUP_CONCAT(DISTINCT c.pic_name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_pic
        FROM notas n
        JOIN suppliers s ON s.id=n.supplier_id
        JOIN pos p ON p.id=n.po_id
@@ -709,7 +700,7 @@ app.use((e, req, res, next) => {
   const sql = e.code && String(e.code).startsWith('ER_');
   const status =
     e.status || (e.name === 'MulterError' ? 400 : sql ? 409 : 500);
-  if (status === 500 || sql) console.error(e);
+  if (status === 500) console.error(e);
   res.status(status).json({
     success: false,
     message: sql
