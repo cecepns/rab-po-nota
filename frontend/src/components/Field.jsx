@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import AsyncSelect from "react-select/async";
 import { api } from "@/utils/api";
+import { fileUrl } from "@/utils/format";
 
 const selectStyles = {
   control: (base, state) => ({
@@ -169,13 +170,57 @@ export default function Field({ field, value, onChange }) {
       </div>
     );
   } else if (field.type === "file") {
+    const isFileInstance = value instanceof File;
+    const previewSrc = isFileInstance
+      ? URL.createObjectURL(value)
+      : typeof value === "string" && value
+      ? fileUrl(value)
+      : null;
+
     input = (
-      <input
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        className="input"
-        onChange={(e) => onChange(e.target.files[0])}
-      />
+      <div className="space-y-2">
+        {previewSrc && (
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs flex items-center justify-center p-0.5">
+              <img
+                src={previewSrc}
+                alt="Preview"
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+            <div className="flex-1 min-w-0 text-xs">
+              <p className="font-semibold text-slate-800 truncate">
+                {isFileInstance ? value.name : value}
+              </p>
+              <p className="text-[11px] text-teal-600 font-medium">
+                {isFileInstance ? "File baru dipilih" : "File saat ini terpasang"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="rounded-lg px-2.5 py-1 text-xs text-rose-500 hover:bg-rose-50 font-medium transition"
+              title="Hapus file ini"
+            >
+              Hapus
+            </button>
+          </div>
+        )}
+
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="input !py-1.5 text-xs file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              onChange(e.target.files[0]);
+            }
+          }}
+        />
+      </div>
     );
   } else if (field.type === "textarea") {
     input = (

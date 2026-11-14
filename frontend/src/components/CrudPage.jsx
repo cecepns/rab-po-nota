@@ -16,7 +16,7 @@ export default function CrudPage({ title, list, detail, columns, fields, initial
   const [saving, setSaving] = useState(false);
 
   const openForm = (row) => {
-    setForm(row ? Object.fromEntries(fields.filter((f) => f.type !== "file").map((f) => [f.name, row[f.name]])) : initial);
+    setForm(row ? Object.fromEntries(fields.map((f) => [f.name, row[f.name]])) : initial);
     setModal({ id: row?.id });
   };
 
@@ -25,7 +25,20 @@ export default function CrudPage({ title, list, detail, columns, fields, initial
     const missing = fields.find((f) => f.required && !form[f.name]);
     if (missing) return request(() => Promise.reject({ response: { data: { message: `${missing.label} wajib diisi` } } }));
     const fd = new FormData();
-    fields.forEach((f) => { const v = form[f.name]; if (v !== undefined && v !== null) fd.append(f.name, v); });
+    fields.forEach((f) => {
+      const v = form[f.name];
+      if (f.type === "file") {
+        if (v instanceof File) {
+          fd.append(f.name, v);
+        } else if (v === null && modal?.id) {
+          fd.append(f.name, "__delete__");
+        }
+      } else {
+        if (v !== undefined && v !== null) {
+          fd.append(f.name, v);
+        }
+      }
+    });
     setSaving(true);
     const res = await request(() => (modal.id ? api.put(detail(modal.id), fd) : api.post(list, fd)), modal.id ? "Data diperbarui" : "Data ditambahkan");
     setSaving(false);

@@ -195,7 +195,11 @@ const values = (c, req) => {
   });
   c.files?.forEach((f) => {
     const x = req.files?.[f]?.[0];
-    if (x) o[f] = x.filename;
+    if (x) {
+      o[f] = x.filename;
+    } else if (req.body[f] === '__delete__') {
+      o[f] = null;
+    }
   });
   return o;
 };
