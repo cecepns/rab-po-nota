@@ -12,6 +12,10 @@ import {
   Sparkles,
   Search,
   Copy,
+  FileSpreadsheet,
+  Printer,
+  RotateCcw,
+  Download,
 } from "lucide-react";
 import AsyncCreatableSelect from "react-select/async-creatable";
 import AsyncSelect from "react-select/async";
@@ -94,7 +98,24 @@ const creatableSelectStyles = {
 };
 
 export default function Rab() {
-  const paged = usePaged(E.RAB.LIST);
+  // Filter Rentang Waktu (Bisa difilter dari - sampai)
+  const [dateRange, setDateRange] = useState({
+    from: today().slice(0, 8) + "01", // Awal bulan ini
+    to: today(), // Hari ini
+  });
+  const [activePreset, setActivePreset] = useState("month");
+
+  // Query params reaktif untuk usePaged
+  const queryParams = useMemo(() => {
+    const p = {};
+    if (dateRange.from) p.from = dateRange.from;
+    if (dateRange.to) p.to = dateRange.to;
+    return p;
+  }, [dateRange]);
+
+  const paged = usePaged(E.RAB.LIST, queryParams);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [materialOptions, setMaterialOptions] = useState([]);
@@ -474,6 +495,311 @@ export default function Rab() {
     [suppliers]
   );
 
+  // Preset Periode
+  const applyPreset = (type) => {
+    setActivePreset(type);
+    const cur = today();
+    if (type === "today") {
+      setDateRange({ from: cur, to: cur });
+    } else if (type === "7days") {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      setDateRange({ from: d.toISOString().slice(0, 10), to: cur });
+    } else if (type === "month") {
+      setDateRange({ from: cur.slice(0, 8) + "01", to: cur });
+    } else if (type === "lastmonth") {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+      setDateRange({ from: `${y}-${m}-01`, to: `${y}-${m}-${lastDay}` });
+    } else if (type === "all") {
+      setDateRange({ from: "", to: "" });
+    }
+  };
+
+  // Export Excel (.xls dengan styling & total)
+  const handleExportExcel = async () => {
+    try {
+      setExportingExcel(true);
+      const res = await api.get(E.RAB.LIST, {
+        params: {
+          from: dateRange.from || undefined,
+          to: dateRange.to || undefined,
+          search: paged.search || undefined,
+          all: 1,
+        },
+      });
+      const data = res.data?.data || [];
+      if (!data.length) {
+        alert("Tidak ada data RAB pada rentang waktu ini untuk diekspor.");
+        return;
+      }
+
+      const grandTotal = data.reduce((s, r) => s + (parseFloat(r.total) || 0), 0);
+      const periodText =
+        dateRange.from && dateRange.to
+          ? `${dateRange.from} s/d ${dateRange.to}`
+          : dateRange.from
+          ? `Mulai ${dateRange.from}`
+          : dateRange.to
+          ? `Hingga ${dateRange.to}`
+          : "Semua Waktu";
+
+      const tableHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+          <style>
+            table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 11pt; }
+            th { background-color: #0f766e; color: #ffffff; font-weight: bold; border: 1px solid #0b5852; padding: 8px; text-align: left; }
+            td { border: 1px solid #d1d5db; padding: 6px 8px; vertical-align: middle; }
+            .num { text-align: right; mso-number-format: "#,##0"; }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .total-row { background-color: #f0fdfa; font-weight: bold; color: #0f766e; border-top: 2px solid #0f766e; }
+            .header-title { font-size: 15pt; font-weight: bold; color: #111827; }
+            .header-sub { font-size: 10pt; color: #4b5563; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td colspan="10" class="header-title">RENCANA ANGGARAN BIAYA (RAB) HARIAN</td></tr>
+            <tr><td colspan="10" class="header-sub">Periode: ${periodText} | Dicetak: ${new Date().toLocaleString("id-ID")}</td></tr>
+            <tr><td colspan="10"></td></tr>
+            <thead>
+              <tr>
+                <th class="center" style="width: 40px;">No</th>
+                <th class="center" style="width: 100px;">Tanggal</th>
+                <th style="width: 180px;">Pelanggan / SPPG</th>
+                <th style="width: 220px;">Uraian / Nama Bahan</th>
+                <th style="width: 180px;">Toko / Supplier</th>
+                <th class="center" style="width: 70px;">Satuan</th>
+                <th class="num" style="width: 80px;">Qty</th>
+                <th class="num" style="width: 120px;">Harga Satuan (Rp)</th>
+                <th class="num" style="width: 130px;">Jumlah (Rp)</th>
+                <th class="center" style="width: 110px;">Status PO</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data
+                .map(
+                  (r, i) => `
+                <tr>
+                  <td class="center">${i + 1}</td>
+                  <td class="center">${r.date || "-"}</td>
+                  <td>${r.customer_name || "-"}</td>
+                  <td class="bold">${r.item_name || "-"}</td>
+                  <td>${r.supplier_name || "-"}</td>
+                  <td class="center">${r.unit || "-"}</td>
+                  <td class="num">${r.qty || 0}</td>
+                  <td class="num">${r.price || 0}</td>
+                  <td class="num bold">${r.total || 0}</td>
+                  <td class="center">${r.po_no ? "PO: " + r.po_no : "Belum PO"}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="8" class="bold" style="text-align: right; padding: 10px;">TOTAL NILAI RAB:</td>
+                <td class="num bold" style="padding: 10px;">${grandTotal}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(["\uFEFF" + tableHtml], {
+        type: "application/vnd.ms-excel;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const fName = `RAB_${dateRange.from || "semua"}_sd_${dateRange.to || "semua"}.xls`;
+      link.download = fName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Gagal mengekspor data Excel. Silakan coba beberapa saat lagi.");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  // Export PDF / Cetak Format Resmi
+  const handleExportPDF = async () => {
+    try {
+      setExportingPdf(true);
+      const res = await api.get(E.RAB.LIST, {
+        params: {
+          from: dateRange.from || undefined,
+          to: dateRange.to || undefined,
+          search: paged.search || undefined,
+          all: 1,
+        },
+      });
+      const data = res.data?.data || [];
+      if (!data.length) {
+        alert("Tidak ada data RAB pada rentang waktu ini untuk dicetak/diekspor.");
+        return;
+      }
+
+      const grandTotal = data.reduce((s, r) => s + (parseFloat(r.total) || 0), 0);
+      const periodText =
+        dateRange.from && dateRange.to
+          ? `${dateRange.from} s/d ${dateRange.to}`
+          : dateRange.from
+          ? `Mulai ${dateRange.from}`
+          : dateRange.to
+          ? `Hingga ${dateRange.to}`
+          : "Semua Waktu";
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        alert("Pop-up browser terblokir. Izinkan pop-up untuk mencetak / simpan PDF.");
+        return;
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Laporan RAB - ${periodText}</title>
+          <style>
+            @page { size: A4 landscape; margin: 12mm 15mm; }
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; margin: 0; padding: 15px; font-size: 11px; }
+            .header { border-bottom: 2px solid #0f766e; padding-bottom: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
+            .title { font-size: 18px; font-weight: 900; color: #0f766e; letter-spacing: -0.5px; margin: 0 0 4px 0; }
+            .subtitle { font-size: 11px; color: #64748b; margin: 0; }
+            .meta { text-align: right; font-size: 11px; color: #475569; }
+            .meta b { color: #0f766e; }
+            .summary-box { background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px; padding: 10px 14px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+            .summary-item { font-size: 11px; }
+            .summary-item b { font-size: 14px; color: #0f766e; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
+            th { background: #0f766e; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; padding: 7px 6px; border: 1px solid #0f766e; }
+            td { padding: 6px; border: 1px solid #e2e8f0; vertical-align: middle; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 700; }
+            .badge-po { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; background: #e0f2fe; color: #0369a1; }
+            .badge-no-po { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; background: #fef3c7; color: #92400e; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 30px; page-break-inside: avoid; }
+            .sign-box { text-align: center; width: 200px; font-size: 11px; }
+            .sign-space { height: 60px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">RENCANA ANGGARAN BIAYA (RAB) HARIAN</h1>
+              <p class="subtitle">Sistem Pengadaan &bull; Rekapitulasi Kebutuhan Belanja Harian</p>
+            </div>
+            <div class="meta">
+              <div>Periode: <b>${periodText}</b></div>
+              <div>Tanggal Cetak: <b>${new Date().toLocaleDateString("id-ID", { dateStyle: "long" })}</b></div>
+            </div>
+          </div>
+
+          <div class="summary-box">
+            <div class="summary-item">Total Item: <b>${data.length} Baris Bahan</b></div>
+            <div class="summary-item">Total Nilai Anggaran: <b>${rupiah(grandTotal)}</b></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th class="text-center" style="width: 25px;">No</th>
+                <th class="text-center" style="width: 70px;">Tanggal</th>
+                <th style="width: 140px;">Pelanggan / SPPG</th>
+                <th>Uraian / Nama Bahan</th>
+                <th style="width: 140px;">Toko / Supplier</th>
+                <th class="text-center" style="width: 50px;">Satuan</th>
+                <th class="text-right" style="width: 50px;">Qty</th>
+                <th class="text-right" style="width: 80px;">Harga (Rp)</th>
+                <th class="text-right" style="width: 90px;">Jumlah (Rp)</th>
+                <th class="text-center" style="width: 75px;">Status PO</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data
+                .map(
+                  (r, i) => `
+                <tr>
+                  <td class="text-center">${i + 1}</td>
+                  <td class="text-center">${r.date || "-"}</td>
+                  <td>${r.customer_name || "-"}</td>
+                  <td class="font-bold">${r.item_name || "-"}</td>
+                  <td>${r.supplier_name || "-"}</td>
+                  <td class="text-center">${r.unit || "-"}</td>
+                  <td class="text-right font-bold">${+r.qty}</td>
+                  <td class="text-right">${rupiah(r.price)}</td>
+                  <td class="text-right font-bold" style="color: #0f766e;">${rupiah(r.total)}</td>
+                  <td class="text-center">${
+                    r.po_no
+                      ? `<span class="badge-po">${r.po_no}</span>`
+                      : `<span class="badge-no-po">Belum PO</span>`
+                  }</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f0fdfa; font-weight: bold;">
+                <td colspan="8" class="text-right font-bold" style="padding: 8px;">TOTAL NILAI KESELURUHAN:</td>
+                <td class="text-right font-bold" style="color: #0f766e; font-size: 11px; padding: 8px;">${rupiah(grandTotal)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="signatures">
+            <div class="sign-box">
+              <p>Dibuat Oleh,</p>
+              <div class="sign-space"></div>
+              <p>( _______________________ )<br>Petugas RAB</p>
+            </div>
+            <div class="sign-box">
+              <p>Mengetahui,</p>
+              <div class="sign-space"></div>
+              <p>( _______________________ )<br>Koordinator Pengadaan</p>
+            </div>
+            <div class="sign-box">
+              <p>Disetujui Oleh,</p>
+              <div class="sign-space"></div>
+              <p>( _______________________ )<br>Pimpinan / Manajemen</p>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch {
+      alert("Gagal menyiapkan dokumen PDF. Silakan coba lagi.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Action */}
@@ -493,6 +819,119 @@ export default function Rab() {
         >
           <Plus size={16} /> Input RAB (Multi-Item)
         </button>
+      </div>
+
+      {/* Filter Rentang Waktu & Aksi Export Excel / PDF */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs lg:flex-row lg:items-center lg:justify-between">
+        {/* Kontrol Rentang Waktu */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Presets */}
+          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200/60 text-xs">
+            <button
+              type="button"
+              onClick={() => applyPreset("today")}
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "today"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Hari Ini
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset("7days")}
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "7days"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              7 Hari
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset("month")}
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "month"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Bulan Ini
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset("all")}
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "all"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Semua
+            </button>
+          </div>
+
+          {/* Custom Date Pickers */}
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              className="input !py-1.5 !px-2.5 text-xs font-medium"
+              value={dateRange.from}
+              onChange={(e) => {
+                setActivePreset(null);
+                setDateRange({ ...dateRange, from: e.target.value });
+              }}
+            />
+            <span className="text-xs text-slate-400 font-bold">-</span>
+            <input
+              type="date"
+              className="input !py-1.5 !px-2.5 text-xs font-medium"
+              value={dateRange.to}
+              onChange={(e) => {
+                setActivePreset(null);
+                setDateRange({ ...dateRange, to: e.target.value });
+              }}
+            />
+          </div>
+
+          {(dateRange.from || dateRange.to) && (
+            <button
+              type="button"
+              onClick={() => applyPreset("all")}
+              title="Reset Filter Tanggal"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-rose-600 transition"
+            >
+              <RotateCcw size={12} /> Reset
+            </button>
+          )}
+        </div>
+
+        {/* Tombol Export Excel & PDF */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 transition shadow-2xs disabled:opacity-50"
+            title="Download file Excel (.xls)"
+          >
+            <FileSpreadsheet size={15} className="text-emerald-700" />
+            {exportingExcel ? "Mengekspor..." : "Export Excel"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={exportingPdf}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-teal-800 transition shadow-2xs disabled:opacity-50"
+            title="Cetak atau Simpan sebagai PDF"
+          >
+            <Printer size={15} className="text-teal-700" />
+            {exportingPdf ? "Menyiapkan..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Tabel Data RAB */}

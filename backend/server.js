@@ -511,7 +511,13 @@ app.get(
   auth,
   wrap(async (req, res) => {
     const [[nota]] = await db.query(
-      'SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no FROM notas n JOIN suppliers s ON s.id=n.supplier_id JOIN pos p ON p.id=n.po_id WHERE n.id=?',
+      `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no,
+        (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_name,
+        (SELECT GROUP_CONCAT(DISTINCT c.pic_name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_pic
+       FROM notas n
+       JOIN suppliers s ON s.id=n.supplier_id
+       JOIN pos p ON p.id=n.po_id
+       WHERE n.id=?`,
       [req.params.id],
     );
     if (!nota) throw fail(404, 'Nota tidak ditemukan');
@@ -567,7 +573,12 @@ app.get(
   wrap(async (req, res) => {
     const { c, query: q } = req;
     const page = Math.max(1, parseInt(q.page) || 1);
-    const limit = [10, 25, 50, 100].includes(+q.limit) ? +q.limit : 10;
+    const isAll = q.all === '1' || q.all === 'true' || +q.limit === -1;
+    const limit = isAll
+      ? 100000
+      : [10, 25, 50, 100, 250, 500, 1000].includes(+q.limit)
+      ? +q.limit
+      : 10;
     const where = [];
     const args = [];
 
@@ -578,7 +589,19 @@ app.get(
       c.search.forEach(() => args.push(`%${q.search}%`));
     }
 
+    // Filter rentang tanggal jika ada query 'from' atau 'to'
+    if (q.from && c.filters?.includes('date')) {
+      where.push('t.date >= ?');
+      args.push(q.from);
+    }
+    if (q.to && c.filters?.includes('date')) {
+      where.push('t.date <= ?');
+      args.push(q.to);
+    }
+
     (c.filters || []).forEach((f) => {
+      // Lewati 'date' jika sudah menggunakan rentang from/to
+      if (f === 'date' && (q.from || q.to)) return;
       if (q[f]) {
         where.push(`t.${f}=?`);
         args.push(q[f]);
