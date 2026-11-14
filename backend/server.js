@@ -1,0 +1,552 @@
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const mysql = require('mysql2/promise');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+
+const {
+  PORT = 5000,
+  DB_HOST = 'localhost',
+  DB_USER = 'root',
+  DB_PASS = '',
+  DB_NAME = 'rab_po_nota',
+  JWT_SECRET,
+  ADMIN_USER = 'admin',
+  ADMIN_PASS = 'admin123',
+} = process.env;
+
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET wajib diisi di .env');
+  process.exit(1);
+}
+
+const UPLOAD_DIR = path.join(__dirname, 'uploads-rab-po-nota');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const db = mysql.createPool({
+  host: DB_HOST,
+  user: DB_USER,
+  password: DB_PASS,
+  database: DB_NAME,
+  connectionLimit: 10,
+  dateStrings: true,
+});
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_, f, cb) =>
+      cb(
+        null,
+        crypto.randomUUID() + path.extname(f.originalname).toLowerCase(),
+      ),
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_, f, cb) => {
+    const ok = /^image\/(png|jpe?g|webp)$/.test(f.mimetype);
+    cb(
+      ok
+        ? null
+        : Object.assign(new Error('Hanya gambar png/jpg/webp (maks 2MB)'), {
+            status: 400,
+          }),
+      ok,
+    );
+  },
+});
+
+const app = express();
+app.use(cors(), express.json(), express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+// ---------- helpers ----------
+const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
+const fail = (status, message) =>
+  Object.assign(new Error(message), { status });
+const clean = (v) => (typeof v === 'string' ? v.trim().replace(/[<>]/g, '') : v);
+
+const auth = (req, res, next) => {
+  try {
+    req.user = jwt.verify(
+      (req.headers.authorization || '').replace('Bearer ', ''),
+      JWT_SECRET,
+    );
+    next();
+  } catch {
+    next(fail(401, 'Sesi berakhir, silakan login ulang'));
+  }
+};
+
+const ok = (res, data, pagination) =>
+  res.json({ success: true, data, ...(pagination && { pagination }) });
+
+const fileFields = upload.fields([
+  { name: 'logo', maxCount: 1 },
+  { name: 'signature', maxCount: 1 },
+]);
+
+// ---------- resource config (generic CRUD + pagination/search/sort/filter) ----------
+const R = {
+  suppliers: {
+    table: 'suppliers',
+    from: 'suppliers t',
+    select: 't.*',
+    cols: ['name', 'address', 'phone'],
+    files: ['logo', 'signature'],
+    req: ['name'],
+    search: ['t.name', 't.phone'],
+    sort: ['id', 'name'],
+  },
+  customers: {
+    table: 'customers',
+    from: 'customers t',
+    select: 't.*',
+    cols: ['name', 'phone', 'address'],
+    req: ['name'],
+    search: ['t.name', 't.phone'],
+    sort: ['id', 'name'],
+  },
+  rab: {
+    table: 'rab_items',
+    cols: [
+      'date',
+      'customer_id',
+      'supplier_id',
+      'item_name',
+      'qty',
+      'unit',
+      'price',
+    ],
+    req: ['date', 'customer_id', 'supplier_id', 'item_name', 'qty', 'price'],
+    num: ['qty', 'price'],
+    from: 'rab_items t LEFT JOIN customers c ON c.id=t.customer_id LEFT JOIN suppliers s ON s.id=t.supplier_id LEFT JOIN pos p ON p.id=t.po_id',
+    select: 't.*, c.name customer_name, s.name supplier_name, p.po_no',
+    search: ['t.item_name', 'c.name', 's.name'],
+    filters: ['date', 'customer_id', 'supplier_id', 'po_id'],
+    sort: ['id', 'date', 'item_name', 'total'],
+  },
+  pos: {
+    table: 'pos',
+    readOnly: true,
+    from: 'pos t LEFT JOIN suppliers s ON s.id=t.supplier_id',
+    select:
+      't.*, s.name supplier_name, (SELECT COALESCE(SUM(total),0) FROM rab_items WHERE po_id=t.id) total, (SELECT id FROM notas WHERE po_id=t.id) nota_id',
+    search: ['t.po_no', 's.name'],
+    filters: ['date', 'supplier_id'],
+    sort: ['id', 'date', 'po_no'],
+  },
+  notas: {
+    table: 'notas',
+    readOnly: true,
+    from: 'notas t LEFT JOIN suppliers s ON s.id=t.supplier_id LEFT JOIN pos p ON p.id=t.po_id',
+    select:
+      't.*, s.name supplier_name, p.po_no, (SELECT COALESCE(SUM(total),0) FROM nota_items WHERE nota_id=t.id) total',
+    search: ['t.nota_no', 's.name', 'p.po_no'],
+    filters: ['date', 'supplier_id'],
+    sort: ['id', 'date', 'nota_no'],
+  },
+};
+
+const resource = (req, res, next) => {
+  req.c = R[req.params.r];
+  req.c ? next() : next(fail(404, 'Resource tidak ditemukan'));
+};
+
+const values = (c, req) => {
+  const o = {};
+  c.cols?.forEach((k) => {
+    if (req.body[k] !== undefined) {
+      const v = clean(req.body[k]);
+      o[k] = v === '' ? null : v;
+    }
+  });
+  c.files?.forEach((f) => {
+    const x = req.files?.[f]?.[0];
+    if (x) o[f] = x.filename;
+  });
+  return o;
+};
+
+const validate = (c, o, partial) => {
+  (c.req || []).forEach((k) => {
+    if ((!partial || k in o) && o[k] == null) {
+      throw fail(400, `Field ${k} wajib diisi`);
+    }
+  });
+  (c.num || []).forEach((k) => {
+    if (
+      k in o &&
+      (isNaN(o[k]) || +o[k] < 0 || (k === 'qty' && +o[k] <= 0))
+    ) {
+      throw fail(400, `Field ${k} tidak valid`);
+    }
+  });
+};
+
+// ---------- auth ----------
+app.post(
+  '/api/auth/login',
+  wrap(async (req, res) => {
+    const [[u]] = await db.query('SELECT * FROM users WHERE username=?', [
+      clean(req.body.username) || '',
+    ]);
+    if (!u || !(await bcrypt.compare(req.body.password || '', u.password))) {
+      throw fail(401, 'Username atau password salah');
+    }
+    ok(res, {
+      token: jwt.sign({ id: u.id, username: u.username }, JWT_SECRET, {
+        expiresIn: '12h',
+      }),
+      user: { username: u.username },
+    });
+  }),
+);
+
+app.get('/api/auth/profile', auth, (req, res) => ok(res, req.user));
+
+// ---------- users management ----------
+app.get(
+  '/api/users',
+  auth,
+  wrap(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = [10, 25, 50, 100].includes(+req.query.limit)
+      ? +req.query.limit
+      : 10;
+    const search = clean(req.query.search) || '';
+    const where = search ? 'WHERE username LIKE ?' : '';
+    const args = search ? [`%${search}%`] : [];
+
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) total FROM users ${where}`,
+      args,
+    );
+    const [rows] = await db.query(
+      `SELECT id, username, created_at FROM users ${where} ORDER BY id ASC LIMIT ? OFFSET ?`,
+      [...args, limit, (page - 1) * limit],
+    );
+    ok(res, rows, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  }),
+);
+
+app.post(
+  '/api/users',
+  auth,
+  wrap(async (req, res) => {
+    const username = clean(req.body.username);
+    const password = req.body.password;
+    if (!username) throw fail(400, 'Username wajib diisi');
+    if (!password || password.length < 4) {
+      throw fail(400, 'Password minimal 4 karakter');
+    }
+
+    const [[existing]] = await db.query(
+      'SELECT id FROM users WHERE username=?',
+      [username],
+    );
+    if (existing) throw fail(409, 'Username sudah digunakan');
+
+    const hash = await bcrypt.hash(password, 10);
+    const [r] = await db.query(
+      'INSERT INTO users (username, password) VALUES (?, ?)',
+      [username, hash],
+    );
+    ok(res, { id: r.insertId, username });
+  }),
+);
+
+app.put(
+  '/api/users/:id',
+  auth,
+  wrap(async (req, res) => {
+    const id = +req.params.id;
+    const username = clean(req.body.username);
+    const password = req.body.password;
+    if (!username) throw fail(400, 'Username wajib diisi');
+
+    const [[existing]] = await db.query(
+      'SELECT id FROM users WHERE username=? AND id!=?',
+      [username, id],
+    );
+    if (existing) throw fail(409, 'Username sudah digunakan user lain');
+
+    if (password) {
+      if (password.length < 4) throw fail(400, 'Password minimal 4 karakter');
+      const hash = await bcrypt.hash(password, 10);
+      await db.query(
+        'UPDATE users SET username=?, password=? WHERE id=?',
+        [username, hash, id],
+      );
+    } else {
+      await db.query('UPDATE users SET username=? WHERE id=?', [username, id]);
+    }
+    ok(res, true);
+  }),
+);
+
+app.delete(
+  '/api/users/:id',
+  auth,
+  wrap(async (req, res) => {
+    const id = +req.params.id;
+    if (req.user.id === id) {
+      throw fail(400, 'Tidak dapat menghapus akun Anda sendiri yang sedang aktif');
+    }
+
+    const [[{ count }]] = await db.query('SELECT COUNT(*) count FROM users');
+    if (count <= 1) {
+      throw fail(400, 'Tidak dapat menghapus user terakhir di sistem');
+    }
+
+    await db.query('DELETE FROM users WHERE id=?', [id]);
+    ok(res, true);
+  }),
+);
+
+// ---------- PO / Nota / Report ----------
+app.post(
+  '/api/pos/generate',
+  auth,
+  wrap(async (req, res) => {
+    const { date, supplier_id } = req.body;
+    if (!date || !supplier_id) throw fail(400, 'Tanggal dan supplier wajib diisi');
+
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [lines] = await conn.query(
+        'SELECT id FROM rab_items WHERE date=? AND supplier_id=? AND po_id IS NULL FOR UPDATE',
+        [date, supplier_id],
+      );
+      if (!lines.length) {
+        throw fail(
+          400,
+          'Tidak ada item RAB yang belum masuk PO untuk tanggal & supplier ini',
+        );
+      }
+      const [[{ n }]] = await conn.query(
+        'SELECT COUNT(*) n FROM pos WHERE date=? AND supplier_id=?',
+        [date, supplier_id],
+      );
+      const po_no = `PO/${date.replace(/-/g, '')}/${supplier_id}-${n + 1}`;
+      const [r] = await conn.query('INSERT INTO pos SET ?', [
+        { po_no, date, supplier_id },
+      ]);
+      await conn.query('UPDATE rab_items SET po_id=? WHERE id IN (?)', [
+        r.insertId,
+        lines.map((l) => l.id),
+      ]);
+      await conn.commit();
+      ok(res, { id: r.insertId, po_no });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  }),
+);
+
+app.post(
+  '/api/notas/generate',
+  auth,
+  wrap(async (req, res) => {
+    const [[po]] = await db.query('SELECT * FROM pos WHERE id=?', [
+      req.body.po_id,
+    ]);
+    if (!po) throw fail(404, 'PO tidak ditemukan');
+
+    const [[dup]] = await db.query('SELECT id FROM notas WHERE po_id=?', [
+      po.id,
+    ]);
+    if (dup) throw fail(409, 'Nota untuk PO ini sudah ada');
+
+    const nota_no = po.po_no.replace('PO/', 'NT/');
+    const [r] = await db.query('INSERT INTO notas SET ?', [
+      { nota_no, date: po.date, supplier_id: po.supplier_id, po_id: po.id },
+    ]);
+    await db.query(
+      'INSERT INTO nota_items (nota_id,item_name,qty,unit,price) SELECT ?,item_name,SUM(qty),unit,price FROM rab_items WHERE po_id=? GROUP BY item_name,unit,price',
+      [r.insertId, po.id],
+    );
+    ok(res, { id: r.insertId });
+  }),
+);
+
+app.get(
+  '/api/notas/:id/detail',
+  auth,
+  wrap(async (req, res) => {
+    const [[nota]] = await db.query(
+      'SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.logo, s.signature, p.po_no FROM notas n JOIN suppliers s ON s.id=n.supplier_id JOIN pos p ON p.id=n.po_id WHERE n.id=?',
+      [req.params.id],
+    );
+    if (!nota) throw fail(404, 'Nota tidak ditemukan');
+
+    const [items] = await db.query(
+      'SELECT * FROM nota_items WHERE nota_id=? ORDER BY id',
+      [nota.id],
+    );
+    ok(res, { ...nota, items });
+  }),
+);
+
+app.put(
+  '/api/nota-items/:id',
+  auth,
+  wrap(async (req, res) => {
+    const { qty, price } = req.body;
+    if (isNaN(qty) || isNaN(price) || +qty <= 0 || +price < 0) {
+      throw fail(400, 'Qty/harga tidak valid');
+    }
+    await db.query('UPDATE nota_items SET qty=?, price=? WHERE id=?', [
+      qty,
+      price,
+      req.params.id,
+    ]);
+    ok(res, true);
+  }),
+);
+
+app.get(
+  '/api/report/summary',
+  auth,
+  wrap(async (req, res) => {
+    const from = req.query.from || '1970-01-01';
+    const to = req.query.to || '2999-12-31';
+    const [rows] = await db.query(
+      `SELECT s.id, s.name,
+        COALESCE((SELECT SUM(total) FROM rab_items WHERE supplier_id=s.id AND date BETWEEN ? AND ?),0) rab_total,
+        COALESCE((SELECT SUM(total) FROM rab_items WHERE supplier_id=s.id AND po_id IS NOT NULL AND date BETWEEN ? AND ?),0) po_total,
+        COALESCE((SELECT SUM(ni.total) FROM nota_items ni JOIN notas n ON n.id=ni.nota_id WHERE n.supplier_id=s.id AND n.date BETWEEN ? AND ?),0) nota_total
+       FROM suppliers s ORDER BY s.name`,
+      [from, to, from, to, from, to],
+    );
+    ok(res, rows);
+  }),
+);
+
+// ---------- generic CRUD (taruh paling akhir) ----------
+app.get(
+  '/api/:r',
+  auth,
+  resource,
+  wrap(async (req, res) => {
+    const { c, query: q } = req;
+    const page = Math.max(1, parseInt(q.page) || 1);
+    const limit = [10, 25, 50, 100].includes(+q.limit) ? +q.limit : 10;
+    const where = [];
+    const args = [];
+
+    if (q.search) {
+      where.push(
+        '(' + c.search.map((s) => `${s} LIKE ?`).join(' OR ') + ')',
+      );
+      c.search.forEach(() => args.push(`%${q.search}%`));
+    }
+
+    (c.filters || []).forEach((f) => {
+      if (q[f]) {
+        where.push(`t.${f}=?`);
+        args.push(q[f]);
+      }
+    });
+
+    const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const sort = c.sort.includes(q.sort) ? q.sort : 'id';
+    const dir = q.order === 'asc' ? 'ASC' : 'DESC';
+
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) total FROM ${c.from} ${w}`,
+      args,
+    );
+    const [rows] = await db.query(
+      `SELECT ${c.select} FROM ${c.from} ${w} ORDER BY t.${sort} ${dir} LIMIT ? OFFSET ?`,
+      [...args, limit, (page - 1) * limit],
+    );
+    ok(res, rows, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  }),
+);
+
+app.post(
+  '/api/:r',
+  auth,
+  resource,
+  fileFields,
+  wrap(async (req, res) => {
+    if (req.c.readOnly) throw fail(405, 'Gunakan endpoint generate');
+    const o = values(req.c, req);
+    validate(req.c, o);
+    const [r] = await db.query(`INSERT INTO ${req.c.table} SET ?`, [o]);
+    ok(res, { id: r.insertId });
+  }),
+);
+
+app.put(
+  '/api/:r/:id',
+  auth,
+  resource,
+  fileFields,
+  wrap(async (req, res) => {
+    if (req.c.readOnly) throw fail(405, 'Tidak diizinkan');
+    const o = values(req.c, req);
+    validate(req.c, o, true);
+    if (!Object.keys(o).length) throw fail(400, 'Tidak ada data diubah');
+    await db.query(`UPDATE ${req.c.table} SET ? WHERE id=?`, [o, req.params.id]);
+    ok(res, true);
+  }),
+);
+
+app.delete(
+  '/api/:r/:id',
+  auth,
+  resource,
+  wrap(async (req, res) => {
+    await db.query(`DELETE FROM ${req.c.table} WHERE id=?`, [req.params.id]);
+    ok(res, true);
+  }),
+);
+
+app.use((e, req, res, next) => {
+  const sql = e.code && String(e.code).startsWith('ER_');
+  const status =
+    e.status || (e.name === 'MulterError' ? 400 : sql ? 409 : 500);
+  if (status === 500) console.error(e);
+  res.status(status).json({
+    success: false,
+    message: sql
+      ? 'Data tidak valid atau masih dipakai data lain'
+      : status === 500
+      ? 'Terjadi kesalahan server'
+      : e.message,
+  });
+});
+
+(async () => {
+  const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users');
+  if (!n) {
+    await db.query('INSERT INTO users SET ?', [
+      {
+        username: ADMIN_USER,
+        password: await bcrypt.hash(ADMIN_PASS, 10),
+      },
+    ]);
+  }
+  app.listen(PORT, () => console.log(`API jalan di :${PORT}`));
+})();

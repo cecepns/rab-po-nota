@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0d9488"/>
+      <stop offset="0.6" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#115e59"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="10" y="10" width="100" height="104" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0f766e" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded App Tile -->
+  <rect x="10" y="10" width="100" height="100" rx="28" fill="url(#bgGrad)" filter="url(#shadow)"/>
+  <rect x="10" y="10" width="100" height="50" rx="28" fill="url(#shine)"/>
+
+  <!-- Document (RAB) in back -->
+  <path d="M32 26C32 23.7909 33.7909 22 36 22H68L86 40V86C86 88.2091 84.2091 90 82 90H36C33.7909 90 32 88.2091 32 86V26Z" fill="#ffffff" fill-opacity="0.25"/>
+
+  <!-- Main Card / Receipt (Nota) -->
+  <rect x="42" y="34" width="48" height="60" rx="7" fill="#ffffff"/>
+  
+  <!-- Document Lines -->
+  <rect x="50" y="44" width="32" height="5" rx="2.5" fill="#0f766e"/>
+  <rect x="50" y="55" width="24" height="4.5" rx="2" fill="#14b8a6"/>
+  <rect x="50" y="65" width="28" height="4" rx="2" fill="#99f6e4"/>
+
+  <!-- PO Stamp Badge -->
+  <circle cx="75" cy="78" r="12" fill="#f59e0b"/>
+  <path d="M70 78L73.5 81.5L80 75" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
