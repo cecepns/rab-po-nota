@@ -359,11 +359,10 @@ export default function NotaDetail() {
                 type="button"
                 onClick={() => changeColor(t.colorHex)}
                 title={`${t.name} (${t.desc})`}
-                className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${
-                  currentColor.toLowerCase() === t.colorHex.toLowerCase()
+                className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${currentColor.toLowerCase() === t.colorHex.toLowerCase()
                     ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
                     : "hover:opacity-80"
-                }`}
+                  }`}
                 style={{ backgroundColor: t.colorHex }}
               >
                 {currentColor.toLowerCase() === t.colorHex.toLowerCase() && (
@@ -388,7 +387,7 @@ export default function NotaDetail() {
           </div>
 
           {/* Tombol Download PDF */}
-          <button
+          {/* <button
             onClick={handleDownloadPDF}
             disabled={isGeneratingPdf}
             className="btn-primary flex items-center justify-center gap-2 text-xs font-bold py-2 px-3.5 shadow-sm"
@@ -396,7 +395,7 @@ export default function NotaDetail() {
           >
             <Download size={15} />
             {isGeneratingPdf ? "Menyiapkan..." : "Download PDF"}
-          </button>
+          </button> */}
 
           {/* Tombol Cetak Browser */}
           <button
