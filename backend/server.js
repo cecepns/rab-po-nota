@@ -63,7 +63,17 @@ const upload = multer({
 
 const app = express();
 app.use(cors(), express.json(), express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(UPLOAD_DIR));
+app.use(
+  '/uploads',
+  cors(),
+  express.static(UPLOAD_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
 // ---------- helpers ----------
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);

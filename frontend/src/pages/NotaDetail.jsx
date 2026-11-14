@@ -431,7 +431,7 @@ export default function NotaDetail() {
                           type="number"
                           step="any"
                           min="0"
-                          className={`w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:${theme.borderHeader} outline-none print:hidden`}
+                          className="w-full rounded-md border border-slate-200 bg-white py-1 px-1.5 text-right font-bold text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none print:hidden"
                           value={it.price}
                           onChange={(e) => edit(i, "price", e.target.value)}
                           onBlur={() => save(it)}
