@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Printer, ArrowLeft, Building2, Download, Palette, Pipette } from "lucide-react";
-import html2pdf from "html2pdf.js";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
@@ -221,59 +222,54 @@ export default function NotaDetail() {
       load();
   };
 
-  // Fungsi Export / Download PDF menggunakan html2pdf dengan penanganan error lengkap
+  // Fungsi Export / Download PDF langsung menggunakan html2canvas + jsPDF (100% kompatibel di semua browser modern)
   const handleDownloadPDF = async () => {
     if (!notaRef.current || !nota) return;
     setIsGeneratingPdf(true);
 
-    // Beri jeda kecil agar React render state preview tanpa input
-    setTimeout(async () => {
-      try {
-        let pdfFn = html2pdf;
-        if (typeof pdfFn !== "function" && pdfFn?.default) {
-          pdfFn = pdfFn.default;
-        }
-        if (typeof pdfFn !== "function" && window.html2pdf) {
-          pdfFn = window.html2pdf;
-        }
-        if (typeof pdfFn !== "function") {
-          throw new Error("Modul html2pdf tidak tersedia.");
-        }
+    try {
+      // Beri jeda sekejap agar state preview bersih tanpa input interaktif
+      await new Promise((resolve) => setTimeout(resolve, 80));
 
-        const cleanNo = (nota.nota_no || "nota").replace(/[\/\\:]/g, "_");
-        const element = notaRef.current;
+      const element = notaRef.current;
+      const cleanNo = (nota.nota_no || "nota").replace(/[\/\\:]/g, "_");
 
-        const opt = {
-          margin: [6, 8, 6, 8],
-          filename: `Nota_${cleanNo}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            scrollY: 0,
-            scrollX: 0,
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
-        };
+      // Render elemen ke high-DPI canvas
+      const canvas = await html2canvas(element, {
+        scale: 2, // Resolusi tinggi dan tajam
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+      });
 
-        await pdfFn().set(opt).from(element).save();
-      } catch (err) {
-        console.error("Gagal export PDF html2pdf:", err);
-        // Fallback langsung buka Cetak Browser (di mana sudah kita buat 1 halaman pas & warna solid)
-        if (
-          confirm(
-            "Pembuatan PDF otomatis sedang terhalang sistem browser. Buka Cetak Browser untuk 'Simpan sebagai PDF' (1 halaman rapi & warna pas)?"
-          )
-        ) {
-          window.print();
-        }
-      } finally {
-        setIsGeneratingPdf(false);
-      }
-    }, 120);
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+
+      // Buat file PDF A4 Portrait
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 8;
+      const printWidth = pageWidth - margin * 2; // 194mm
+      const imgHeight = (canvas.height * printWidth) / canvas.width;
+      const renderHeight = Math.min(imgHeight, pageHeight - margin * 2);
+
+      pdf.addImage(imgData, "JPEG", margin, margin, printWidth, renderHeight);
+      pdf.save(`Nota_${cleanNo}.pdf`);
+    } catch (err) {
+      console.error("Gagal export PDF langsung:", err);
+      // Jika terjadi kendala sistem di browser tertentu, gunakan cetak browser
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   if (!nota)
