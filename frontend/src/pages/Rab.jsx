@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Plus,
   Trash2,
@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Sparkles,
   Search,
+  Copy,
 } from "lucide-react";
 import AsyncCreatableSelect from "react-select/async-creatable";
 import AsyncSelect from "react-select/async";
@@ -102,10 +103,16 @@ export default function Rab() {
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchHeader, setBatchHeader] = useState({
     date: today(),
-    customer_ids: [],
   });
   const [batchItems, setBatchItems] = useState([
-    { item_name: "", supplier_id: "", qty: 1, unit: "kg", price: 0 },
+    {
+      customer_id: "",
+      item_name: "",
+      supplier_id: "",
+      qty: 1,
+      unit: "kg",
+      price: 0,
+    },
   ]);
   const [savingBatch, setSavingBatch] = useState(false);
 
@@ -193,7 +200,7 @@ export default function Rab() {
     handleMaterialSelect(idx, newOpt);
   };
 
-  // Search customer untuk AsyncSelect Pelanggan / SPPG (debounce 1 detik)
+  // Search customer untuk AsyncSelect Pelanggan / SPPG
   const customerTimerRef = useRef(null);
   const loadCustomerOptions = useCallback((inputValue, callback) => {
     if (customerTimerRef.current) clearTimeout(customerTimerRef.current);
@@ -219,10 +226,10 @@ export default function Rab() {
       } catch {
         callback([]);
       }
-    }, 1000);
+    }, 250);
   }, []);
 
-  // Search supplier untuk AsyncSelect Toko / Supplier (debounce 1 detik)
+  // Search supplier untuk AsyncSelect Toko / Supplier
   const supplierTimerRef = useRef(null);
   const loadSupplierOptions = useCallback((inputValue, callback) => {
     if (supplierTimerRef.current) clearTimeout(supplierTimerRef.current);
@@ -248,20 +255,38 @@ export default function Rab() {
       } catch {
         callback([]);
       }
-    }, 1000);
+    }, 250);
   }, []);
 
   // Buka Modal Multi-Input baru (refresh master bahan baku)
-  const openBatchModal = () => {
+  const openBatchModal = async () => {
     fetchMaterials();
+
+    let currCust = customers;
+    if (!currCust.length) {
+      try {
+        const res = await api.get(E.CUSTOMERS.LIST, { params: { limit: 100 } });
+        currCust = res.data?.data || [];
+        setCustomers(currCust);
+      } catch {}
+    }
+    let currSupp = suppliers;
+    if (!currSupp.length) {
+      try {
+        const res = await api.get(E.SUPPLIERS.LIST, { params: { limit: 100 } });
+        currSupp = res.data?.data || [];
+        setSuppliers(currSupp);
+      } catch {}
+    }
+
     setBatchHeader({
       date: today(),
-      customer_ids: customers.length ? [customers[0].id] : [],
     });
     setBatchItems([
       {
+        customer_id: currCust[0]?.id || "",
         item_name: "",
-        supplier_id: suppliers[0]?.id || "",
+        supplier_id: currSupp[0]?.id || "",
         qty: 1,
         unit: "kg",
         price: 0,
@@ -270,18 +295,31 @@ export default function Rab() {
     setBatchOpen(true);
   };
 
-  // Tambah baris item baru di batch
+  // Tambah baris item baru di batch (otomatis mewarisi pelanggan & supplier baris sebelumnya)
   const addBatchRow = () => {
+    const lastRow = batchItems[batchItems.length - 1];
     setBatchItems((prev) => [
       ...prev,
       {
+        customer_id: lastRow?.customer_id || customers[0]?.id || "",
         item_name: "",
-        supplier_id: suppliers[0]?.id || "",
+        supplier_id: lastRow?.supplier_id || suppliers[0]?.id || "",
         qty: 1,
         unit: "kg",
         price: 0,
       },
     ]);
+  };
+
+  // Salin/Duplikasi baris item
+  const duplicateBatchRow = (idx) => {
+    const row = batchItems[idx];
+    if (!row) return;
+    setBatchItems((prev) => {
+      const next = [...prev];
+      next.splice(idx + 1, 0, { ...row });
+      return next;
+    });
   };
 
   // Hapus baris item di batch
@@ -340,29 +378,28 @@ export default function Rab() {
   // Simpan Batch RAB
   const submitBatch = async (e) => {
     e.preventDefault();
-    if (!batchHeader.customer_ids || !batchHeader.customer_ids.length) {
-      alert("Silakan pilih minimal 1 Pelanggan / SPPG");
-      return;
-    }
 
     const invalid = batchItems.find(
-      (it) => !it.item_name || !it.supplier_id || !it.qty || it.qty <= 0
+      (it) =>
+        !it.customer_id ||
+        !it.item_name ||
+        !it.supplier_id ||
+        !it.qty ||
+        it.qty <= 0
     );
     if (invalid) {
-      alert("Pastikan nama bahan, supplier, dan qty terisi dengan benar di setiap baris.");
+      alert("Pastikan Pelanggan, Nama Bahan, Supplier, dan Qty terisi dengan benar di setiap baris.");
       return;
     }
 
     setSavingBatch(true);
-    const totalItems = batchItems.length * batchHeader.customer_ids.length;
     const res = await request(
       () =>
         api.post(E.RAB.BATCH, {
           date: batchHeader.date,
-          customer_ids: batchHeader.customer_ids,
           items: batchItems,
         }),
-      `Berhasil menyimpan ${totalItems} item RAB untuk ${batchHeader.customer_ids.length} pelanggan!`
+      `Berhasil menyimpan ${batchItems.length} item RAB!`
     );
     setSavingBatch(false);
 
@@ -412,24 +449,30 @@ export default function Rab() {
     }
   };
 
-  // Grand Total perhitungan di batch modal (dikalikan jumlah pelanggan terpilih)
-  const singleBatchTotal = batchItems.reduce(
+  // Grand Total perhitungan di batch modal
+  const batchGrandTotal = batchItems.reduce(
     (sum, it) => sum + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0),
     0
   );
-  const batchGrandTotal =
-    singleBatchTotal * (batchHeader.customer_ids?.length || 1);
 
-  const customerOptions = customers.map((c) => ({
-    value: c.id,
-    label: c.name,
-    data: c,
-  }));
-  const supplierOptions = suppliers.map((s) => ({
-    value: s.id,
-    label: s.name,
-    data: s,
-  }));
+  const customerOptions = useMemo(
+    () =>
+      customers.map((c) => ({
+        value: c.id,
+        label: c.name,
+        data: c,
+      })),
+    [customers]
+  );
+  const supplierOptions = useMemo(
+    () =>
+      suppliers.map((s) => ({
+        value: s.id,
+        label: s.name,
+        data: s,
+      })),
+    [suppliers]
+  );
 
   return (
     <div className="space-y-6">
@@ -547,9 +590,9 @@ export default function Rab() {
 
             {/* Modal Body */}
             <form onSubmit={submitBatch} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-              {/* Header Input: Tanggal & Pelanggan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-4">
-                <div className="space-y-1.5">
+              {/* Header Input: Tanggal RAB */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1 sm:w-72">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                     <Calendar size={14} className="text-teal-600" /> Tanggal RAB *
                   </label>
@@ -563,73 +606,8 @@ export default function Rab() {
                     }
                   />
                 </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                      <Users size={14} className="text-teal-600" /> Pelanggan / SPPG *
-                      {batchHeader.customer_ids.length > 0 && (
-                        <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-800">
-                          {batchHeader.customer_ids.length} dipilih
-                        </span>
-                      )}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBatchHeader({
-                            ...batchHeader,
-                            customer_ids: customers.map((c) => c.id),
-                          })
-                        }
-                        className="text-[11px] font-bold text-teal-700 hover:text-teal-800 hover:underline"
-                      >
-                        Pilih Semua
-                      </button>
-                      {batchHeader.customer_ids.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBatchHeader({
-                              ...batchHeader,
-                              customer_ids: [],
-                            })
-                          }
-                          className="text-[11px] font-semibold text-slate-400 hover:text-rose-600"
-                        >
-                          Reset
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <AsyncSelect
-                    isMulti
-                    cacheOptions
-                    defaultOptions={customerOptions}
-                    loadOptions={loadCustomerOptions}
-                    value={customerOptions.filter((c) =>
-                      batchHeader.customer_ids.includes(c.value)
-                    )}
-                    onChange={(opts) => {
-                      const ids = (opts || []).map((o) => o.value);
-                      setBatchHeader({
-                        ...batchHeader,
-                        customer_ids: ids,
-                      });
-                      (opts || []).forEach((opt) => {
-                        if (opt?.data && !customers.some((c) => c.id === opt.data.id)) {
-                          setCustomers((prev) => [...prev, opt.data]);
-                        }
-                      });
-                    }}
-                    placeholder="Pilih atau cari satu / beberapa Pelanggan..."
-                    menuPosition="fixed"
-                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                    styles={creatableSelectStyles}
-                    noOptionsMessage={() => "Data pelanggan tidak ditemukan"}
-                    loadingMessage={() => "Mencari..."}
-                  />
+                <div className="text-xs text-slate-500 sm:text-right">
+                  Pilih <b>Pelanggan / SPPG</b> di kolom pertama setiap baris item di bawah. Baris baru otomatis mengikuti pelanggan sebelumnya.
                 </div>
               </div>
 
@@ -655,7 +633,7 @@ export default function Rab() {
                         key={idx}
                         className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3"
                       >
-                        {/* Header Item & Tombol Hapus */}
+                        {/* Header Item & Tombol Aksi */}
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
                             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-50 text-[11px] font-black text-teal-700">
@@ -664,19 +642,66 @@ export default function Rab() {
                             Item Bahan
                           </span>
 
-                          <button
-                            type="button"
-                            onClick={() => removeBatchRow(idx)}
-                            disabled={batchItems.length <= 1}
-                            className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
-                              batchItems.length <= 1
-                                ? "opacity-30 cursor-not-allowed"
-                                : "hover:bg-rose-50 hover:text-rose-600"
-                            }`}
-                            title="Hapus baris item"
-                          >
-                            &times;
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => duplicateBatchRow(idx)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-teal-700 transition"
+                              title="Salin baris ini"
+                            >
+                              <Copy size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeBatchRow(idx)}
+                              disabled={batchItems.length <= 1}
+                              className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
+                                batchItems.length <= 1
+                                  ? "opacity-30 cursor-not-allowed"
+                                  : "hover:bg-rose-50 hover:text-rose-600"
+                              }`}
+                              title="Hapus baris item"
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Pelanggan / SPPG (Kolom Pertama) */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                            <Users size={12} className="text-teal-600" /> Pelanggan / SPPG *
+                          </label>
+                          <AsyncSelect
+                            cacheOptions
+                            defaultOptions={customerOptions}
+                            loadOptions={loadCustomerOptions}
+                            value={
+                              row.customer_id
+                                ? {
+                                    value: row.customer_id,
+                                    label:
+                                      customers.find(
+                                        (c) =>
+                                          c.id === row.customer_id ||
+                                          c.id === +row.customer_id
+                                      )?.name || "Pilih Pelanggan...",
+                                  }
+                                : null
+                            }
+                            onChange={(opt) => {
+                              updateBatchRow(idx, "customer_id", opt ? opt.value : "");
+                              if (opt?.data && !customers.some((c) => c.id === opt.data.id)) {
+                                setCustomers((prev) => [...prev, opt.data]);
+                              }
+                            }}
+                            placeholder="Pilih Pelanggan..."
+                            menuPosition="fixed"
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                            styles={creatableSelectStyles}
+                            noOptionsMessage={() => "Pelanggan tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
+                          />
                         </div>
 
                         {/* Uraian / Nama Bahan */}
@@ -799,19 +824,20 @@ export default function Rab() {
 
                 {/* --- 2. TAMPILAN DESKTOP: TABEL MULTI-KOLOM (hidden md:block) --- */}
                 <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                  <table className="w-full text-left text-sm min-w-[820px]">
+                  <table className="w-full text-left text-sm min-w-[960px]">
                     <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3 w-10 text-center">No</th>
-                        <th className="py-2.5 px-3 min-w-[240px]">
+                        <th className="py-2.5 px-3 min-w-[200px]">Pelanggan / SPPG *</th>
+                        <th className="py-2.5 px-3 min-w-[220px]">
                           Uraian / Nama Bahan *
                         </th>
-                        <th className="py-2.5 px-3 min-w-[220px]">Supplier *</th>
-                        <th className="py-2.5 px-3 w-24">Satuan</th>
-                        <th className="py-2.5 px-3 w-24">Qty *</th>
-                        <th className="py-2.5 px-3 w-32">Harga (Rp) *</th>
-                        <th className="py-2.5 px-3 w-32 text-right">Jumlah</th>
-                        <th className="py-2.5 px-2 w-10 text-center"></th>
+                        <th className="py-2.5 px-3 min-w-[200px]">Supplier *</th>
+                        <th className="py-2.5 px-3 w-20">Satuan</th>
+                        <th className="py-2.5 px-3 w-20">Qty *</th>
+                        <th className="py-2.5 px-3 w-28">Harga (Rp) *</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Jumlah</th>
+                        <th className="py-2.5 px-2 w-16 text-center"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -825,7 +851,52 @@ export default function Rab() {
                               {idx + 1}
                             </td>
 
-                            {/* Uraian dengan AsyncCreatableSelect */}
+                            {/* Kolom 1: Pelanggan / SPPG */}
+                            <td className="py-2 px-3">
+                              <AsyncSelect
+                                cacheOptions
+                                defaultOptions={customerOptions}
+                                loadOptions={loadCustomerOptions}
+                                value={
+                                  row.customer_id
+                                    ? {
+                                        value: row.customer_id,
+                                        label:
+                                          customers.find(
+                                            (c) =>
+                                              c.id === row.customer_id ||
+                                              c.id === +row.customer_id
+                                          )?.name || "Pilih Pelanggan...",
+                                      }
+                                    : null
+                                }
+                                onChange={(opt) => {
+                                  updateBatchRow(
+                                    idx,
+                                    "customer_id",
+                                    opt ? opt.value : ""
+                                  );
+                                  if (
+                                    opt?.data &&
+                                    !customers.some((c) => c.id === opt.data.id)
+                                  ) {
+                                    setCustomers((prev) => [...prev, opt.data]);
+                                  }
+                                }}
+                                placeholder="Pilih Pelanggan..."
+                                menuPosition="fixed"
+                                menuPortalTarget={
+                                  typeof document !== "undefined"
+                                    ? document.body
+                                    : null
+                                }
+                                styles={creatableSelectStyles}
+                                noOptionsMessage={() => "Pelanggan tidak ditemukan"}
+                                loadingMessage={() => "Mencari..."}
+                              />
+                            </td>
+
+                            {/* Kolom 2: Uraian dengan AsyncCreatableSelect */}
                             <td className="py-2 px-3">
                               <AsyncCreatableSelect
                                 defaultOptions={materialOptions}
@@ -851,7 +922,7 @@ export default function Rab() {
                               />
                             </td>
 
-                            {/* Supplier dengan AsyncSelect */}
+                            {/* Kolom 3: Supplier dengan AsyncSelect */}
                             <td className="py-2 px-3">
                               <AsyncSelect
                                 cacheOptions
@@ -947,21 +1018,31 @@ export default function Rab() {
                               {rupiah(lineTotal)}
                             </td>
 
-                            {/* Tombol Hapus Baris */}
+                            {/* Tombol Salin & Hapus Baris */}
                             <td className="py-2 px-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => removeBatchRow(idx)}
-                                disabled={batchItems.length <= 1}
-                                title="Hapus baris"
-                                className={`flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition ${
-                                  batchItems.length <= 1
-                                    ? "opacity-30 cursor-not-allowed"
-                                    : "hover:bg-rose-50 hover:text-rose-600"
-                                }`}
-                              >
-                                &times;
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => duplicateBatchRow(idx)}
+                                  title="Salin baris ini"
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-teal-700 transition"
+                                >
+                                  <Copy size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeBatchRow(idx)}
+                                  disabled={batchItems.length <= 1}
+                                  title="Hapus baris"
+                                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
+                                    batchItems.length <= 1
+                                      ? "opacity-30 cursor-not-allowed"
+                                      : "hover:bg-rose-50 hover:text-rose-600"
+                                  }`}
+                                >
+                                  &times;
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -984,13 +1065,7 @@ export default function Rab() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-4 sm:pt-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full sm:w-auto gap-2 sm:gap-6">
                   <div className="text-xs text-slate-500">
-                    Total: <b>{batchItems.length}</b> Bahan
-                    {batchHeader.customer_ids.length > 1 && (
-                      <span className="ml-1 text-teal-800 font-semibold">
-                        &times; <b>{batchHeader.customer_ids.length}</b> Pelanggan ={" "}
-                        <b>{batchItems.length * batchHeader.customer_ids.length}</b> Item
-                      </span>
-                    )}
+                    Total: <b className="text-slate-800">{batchItems.length}</b> Baris Item RAB
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-600">
@@ -1015,11 +1090,7 @@ export default function Rab() {
                     disabled={savingBatch}
                     className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 py-2.5"
                   >
-                    {savingBatch
-                      ? "Menyimpan..."
-                      : batchHeader.customer_ids.length > 1
-                      ? `Simpan (${batchHeader.customer_ids.length} Pelanggan)`
-                      : "Simpan Semua Item RAB"}
+                    {savingBatch ? "Menyimpan..." : "Simpan Semua Item RAB"}
                   </button>
                 </div>
               </div>

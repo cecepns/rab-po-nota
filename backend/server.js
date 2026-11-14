@@ -392,11 +392,14 @@ app.post(
         }
 
         // Simpan ke rab_items untuk pelanggan terpilih (per baris atau dari header)
-        const targetCustomers = it.customer_id
-          ? [+it.customer_id]
-          : cIds.length
-          ? cIds
-          : [];
+        let targetCustomers = [];
+        if (Array.isArray(it.customer_ids) && it.customer_ids.length > 0) {
+          targetCustomers = it.customer_ids.map((id) => +id).filter(Boolean);
+        } else if (it.customer_id) {
+          targetCustomers = [+it.customer_id].filter(Boolean);
+        } else if (cIds.length) {
+          targetCustomers = cIds;
+        }
 
         if (!targetCustomers.length) {
           throw fail(400, `Pelanggan untuk "${item_name}" wajib dipilih`);
