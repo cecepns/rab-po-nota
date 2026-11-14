@@ -28,39 +28,34 @@ import { rupiah, today } from "@/utils/format";
 const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, trendType }) => {
   const colorMap = {
     teal: {
-      bg: "bg-teal-50",
-      border: "border-teal-100",
-      iconBg: "bg-teal-600 text-white",
-      text: "text-teal-900",
-      accent: "text-teal-600",
+      border: "border-teal-100 hover:border-teal-300",
+      iconBg: "bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/20",
+      subText: "text-slate-500",
     },
     blue: {
-      bg: "bg-sky-50",
-      border: "border-sky-100",
-      iconBg: "bg-sky-600 text-white",
-      text: "text-sky-900",
-      accent: "text-sky-600",
+      border: "border-sky-100 hover:border-sky-300",
+      iconBg: "bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20",
+      subText: "text-slate-500",
     },
     purple: {
-      bg: "bg-purple-50",
-      border: "border-purple-100",
-      iconBg: "bg-purple-600 text-white",
-      text: "text-purple-900",
-      accent: "text-purple-600",
+      border: "border-purple-100 hover:border-purple-300",
+      iconBg: "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/20",
+      subText: "text-slate-500",
     },
     emerald: {
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
-      iconBg: "bg-emerald-600 text-white",
-      text: "text-emerald-900",
-      accent: "text-emerald-600",
+      border: "border-emerald-100 hover:border-emerald-300",
+      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20",
+      subText: "text-emerald-700",
     },
     rose: {
-      bg: "bg-rose-50",
-      border: "border-rose-100",
-      iconBg: "bg-rose-600 text-white",
-      text: "text-rose-900",
-      accent: "text-rose-600",
+      border: "border-rose-100 hover:border-rose-300",
+      iconBg: "bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/20",
+      subText: "text-rose-700",
+    },
+    slate: {
+      border: "border-slate-200 hover:border-slate-300",
+      iconBg: "bg-gradient-to-br from-slate-600 to-slate-700 text-white shadow-md shadow-slate-500/20",
+      subText: "text-slate-500",
     },
   };
 
@@ -68,33 +63,37 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, trendType 
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border ${scheme.border} bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+      className={`relative flex flex-col justify-between rounded-2xl border ${scheme.border} bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-1 min-w-0 flex-1 pr-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
             {title}
           </p>
-          <p className="text-2xl font-black tracking-tight text-slate-900">
+          <p className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 truncate" title={value}>
             {value}
           </p>
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm ${scheme.iconBg}`}>
-          <Icon size={22} />
+
+        {/* Icon box berukuran proporsional yang TIDAK AKAN PERNAH terdistorsi / stretch */}
+        <div
+          className={`flex h-12 w-12 min-w-[48px] min-h-[48px] shrink-0 aspect-square items-center justify-center rounded-2xl ${scheme.iconBg}`}
+        >
+          <Icon size={22} className="shrink-0" />
         </div>
       </div>
 
       {(subtitle || trend) && (
-        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
-          <span className="text-slate-500 font-medium">{subtitle}</span>
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+          <span className={`font-semibold ${scheme.subText}`}>{subtitle}</span>
           {trend && (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold ${
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                 trendType === "danger"
-                  ? "bg-rose-100 text-rose-700"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
                   : trendType === "success"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-100 text-slate-700"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
               }`}
             >
               {trend}
@@ -111,6 +110,7 @@ export default function Dashboard() {
     from: today().slice(0, 8) + "01",
     to: today(),
   });
+  const [activePreset, setActivePreset] = useState("month");
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(false);
   const [chartView, setChartView] = useState("all"); // "all" | "top"
@@ -140,6 +140,7 @@ export default function Dashboard() {
 
   // Preset Periode
   const applyPreset = (type) => {
+    setActivePreset(type);
     const cur = today();
     if (type === "today") {
       setRange({ from: cur, to: cur });
@@ -181,25 +182,41 @@ export default function Dashboard() {
           <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
             <button
               onClick={() => applyPreset("today")}
-              className="rounded-lg px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-white transition"
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "today"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               Hari Ini
             </button>
             <button
               onClick={() => applyPreset("7days")}
-              className="rounded-lg px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-white transition"
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "7days"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               7 Hari
             </button>
             <button
               onClick={() => applyPreset("month")}
-              className="rounded-lg px-2.5 py-1 bg-white text-teal-800 shadow-xs font-bold transition"
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "month"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               Bulan Ini
             </button>
             <button
               onClick={() => applyPreset("all")}
-              className="rounded-lg px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-white transition"
+              className={`rounded-lg px-2.5 py-1 transition ${
+                activePreset === "all"
+                  ? "bg-white text-teal-800 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               Semua
             </button>
@@ -210,14 +227,20 @@ export default function Dashboard() {
               type="date"
               className="input !py-1.5 text-xs font-medium"
               value={range.from}
-              onChange={(e) => setRange({ ...range, from: e.target.value })}
+              onChange={(e) => {
+                setActivePreset(null);
+                setRange({ ...range, from: e.target.value });
+              }}
             />
             <span className="text-xs text-slate-400 font-bold">-</span>
             <input
               type="date"
               className="input !py-1.5 text-xs font-medium"
               value={range.to}
-              onChange={(e) => setRange({ ...range, to: e.target.value })}
+              onChange={(e) => {
+                setActivePreset(null);
+                setRange({ ...range, to: e.target.value });
+              }}
             />
           </div>
 
@@ -266,10 +289,10 @@ export default function Dashboard() {
               ? "Defisit"
               : "Sesuai"
           }
-          icon={selisihTotal < 0 ? TrendingUp : TrendingDown}
-          color={selisihTotal < 0 ? "rose" : "emerald"}
+          icon={selisihTotal < 0 ? TrendingUp : selisihTotal > 0 ? TrendingDown : Scale}
+          color={selisihTotal < 0 ? "rose" : selisihTotal > 0 ? "emerald" : "slate"}
           trend={selisihTotal < 0 ? "Over" : selisihTotal > 0 ? "Hemat" : "Impas"}
-          trendType={selisihTotal < 0 ? "danger" : "success"}
+          trendType={selisihTotal < 0 ? "danger" : selisihTotal > 0 ? "success" : "neutral"}
         />
       </div>
 
