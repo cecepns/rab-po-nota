@@ -13,6 +13,7 @@ import {
   Search,
 } from "lucide-react";
 import AsyncCreatableSelect from "react-select/async-creatable";
+import AsyncSelect from "react-select/async";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import Field from "@/components/Field";
@@ -37,12 +38,13 @@ const creatableSelectStyles = {
     fontSize: "0.875rem",
     minHeight: "38px",
   }),
+  menuPortal: (base) => ({ ...base, zIndex: 99999 }),
   menu: (base) => ({
     ...base,
     borderRadius: "0.75rem",
     boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
     border: "1px solid #f1f5f9",
-    zIndex: 9999,
+    zIndex: 99999,
   }),
   option: (base, state) => ({
     ...base,
@@ -73,6 +75,7 @@ export default function Rab() {
   const paged = usePaged(E.RAB.LIST);
   const [suppliers, setSuppliers] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [materialOptions, setMaterialOptions] = useState([]);
 
   // State Modal Multi-Input (Batch)
   const [batchOpen, setBatchOpen] = useState(false);
@@ -90,6 +93,23 @@ export default function Rab() {
   const [editForm, setEditForm] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Muat opsi Master Bahan Baku dari API
+  const fetchMaterials = useCallback(async () => {
+    try {
+      const res = await api.get(E.MATERIALS.LIST, { params: { limit: 100 } });
+      const items = res.data?.data || [];
+      const opts = items.map((m) => ({
+        value: m.name,
+        label: m.name,
+        data: m,
+      }));
+      setMaterialOptions(opts);
+      return opts;
+    } catch {
+      return [];
+    }
+  }, []);
+
   // Muat opsi Master Supplier & Customer untuk form
   useEffect(() => {
     api
@@ -101,33 +121,118 @@ export default function Rab() {
       .get(E.CUSTOMERS.LIST, { params: { limit: 100 } })
       .then((r) => setCustomers(r.data?.data || []))
       .catch(() => {});
-  }, []);
+
+    fetchMaterials();
+  }, [fetchMaterials]);
 
   // Search bahan baku dari master data / riwayat untuk CreatableSelect
   const searchTimerRef = useRef(null);
-  const loadMaterialOptions = useCallback((inputValue, callback) => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  const loadMaterialOptions = useCallback(
+    (inputValue, callback) => {
+      if (!inputValue || !inputValue.trim()) {
+        callback(materialOptions);
+        return;
+      }
 
-    searchTimerRef.current = setTimeout(async () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get(E.MATERIALS.LIST, {
+            params: { search: inputValue.trim(), limit: 50 },
+          });
+          const items = res.data?.data || [];
+          callback(
+            items.map((m) => ({
+              value: m.name,
+              label: m.name,
+              data: m,
+            }))
+          );
+        } catch {
+          callback([]);
+        }
+      }, 250);
+    },
+    [materialOptions]
+  );
+
+  // Handler buat bahan baku baru langsung dari dropdown
+  const handleCreateMaterial = (idx, inputValue) => {
+    const trimmed = (inputValue || "").trim();
+    if (!trimmed) return;
+    const newOpt = {
+      value: trimmed,
+      label: trimmed,
+      __isNew__: true,
+    };
+    setMaterialOptions((prev) => {
+      if (prev.some((o) => o.value.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return [newOpt, ...prev];
+    });
+    handleMaterialSelect(idx, newOpt);
+  };
+
+  // Search customer untuk AsyncSelect Pelanggan / SPPG (debounce 1 detik)
+  const customerTimerRef = useRef(null);
+  const loadCustomerOptions = useCallback((inputValue, callback) => {
+    if (customerTimerRef.current) clearTimeout(customerTimerRef.current);
+
+    if (!inputValue || !inputValue.trim()) {
+      api
+        .get(E.CUSTOMERS.LIST, { params: { limit: 50 } })
+        .then((res) => {
+          const items = res.data?.data || [];
+          callback(items.map((c) => ({ value: c.id, label: c.name, data: c })));
+        })
+        .catch(() => callback([]));
+      return;
+    }
+
+    customerTimerRef.current = setTimeout(async () => {
       try {
-        const res = await api.get(E.MATERIALS.LIST, {
-          params: { search: inputValue?.trim() || "", limit: 50 },
+        const res = await api.get(E.CUSTOMERS.LIST, {
+          params: { search: inputValue.trim(), limit: 50 },
         });
         const items = res.data?.data || [];
-        const opts = items.map((m) => ({
-          value: m.name,
-          label: m.name,
-          data: m,
-        }));
-        callback(opts);
+        callback(items.map((c) => ({ value: c.id, label: c.name, data: c })));
       } catch {
         callback([]);
       }
-    }, 300);
+    }, 1000);
   }, []);
 
-  // Buka Modal Multi-Input baru
+  // Search supplier untuk AsyncSelect Toko / Supplier (debounce 1 detik)
+  const supplierTimerRef = useRef(null);
+  const loadSupplierOptions = useCallback((inputValue, callback) => {
+    if (supplierTimerRef.current) clearTimeout(supplierTimerRef.current);
+
+    if (!inputValue || !inputValue.trim()) {
+      api
+        .get(E.SUPPLIERS.LIST, { params: { limit: 50 } })
+        .then((res) => {
+          const items = res.data?.data || [];
+          callback(items.map((s) => ({ value: s.id, label: s.name, data: s })));
+        })
+        .catch(() => callback([]));
+      return;
+    }
+
+    supplierTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(E.SUPPLIERS.LIST, {
+          params: { search: inputValue.trim(), limit: 50 },
+        });
+        const items = res.data?.data || [];
+        callback(items.map((s) => ({ value: s.id, label: s.name, data: s })));
+      } catch {
+        callback([]);
+      }
+    }, 1000);
+  }, []);
+
+  // Buka Modal Multi-Input baru (refresh master bahan baku)
   const openBatchModal = () => {
+    fetchMaterials();
     setBatchHeader({
       date: today(),
       customer_id: customers[0]?.id || "",
@@ -184,6 +289,15 @@ export default function Rab() {
     }
 
     const materialData = opt.data;
+    const defaultSuppId = materialData?.default_supplier_id;
+
+    if (defaultSuppId && materialData?.default_supplier_name) {
+      setSuppliers((prev) => {
+        if (prev.some((s) => s.id === defaultSuppId)) return prev;
+        return [...prev, { id: defaultSuppId, name: materialData.default_supplier_name }];
+      });
+    }
+
     setBatchItems((prev) =>
       prev.map((row, i) => {
         if (i !== idx) return row;
@@ -191,8 +305,12 @@ export default function Rab() {
           ...row,
           item_name: opt.label || opt.value,
           unit: materialData?.unit || row.unit || "kg",
-          price: materialData?.price != null && materialData.price > 0 ? materialData.price : row.price,
-          supplier_id: materialData?.default_supplier_id || row.supplier_id || suppliers[0]?.id || "",
+          price:
+            materialData?.price != null && materialData.price > 0
+              ? materialData.price
+              : row.price,
+          supplier_id:
+            defaultSuppId || row.supplier_id || suppliers[0]?.id || "",
         };
       })
     );
@@ -277,6 +395,17 @@ export default function Rab() {
     (sum, it) => sum + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0),
     0
   );
+
+  const customerOptions = customers.map((c) => ({
+    value: c.id,
+    label: c.name,
+    data: c,
+  }));
+  const supplierOptions = suppliers.map((s) => ({
+    value: s.id,
+    label: s.name,
+    data: s,
+  }));
 
   return (
     <div className="space-y-6">
@@ -367,20 +496,20 @@ export default function Rab() {
 
       {/* MODAL MULTI-ITEM INPUT RAB */}
       {batchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-white shadow-xs">
-                  <ShoppingBag size={20} />
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-teal-600 text-white shadow-xs shrink-0">
+                  <ShoppingBag size={18} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-slate-900">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
                     Input RAB Harian (Multi-Item)
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    Masukkan beberapa bahan sekaligus. Bahan baru akan otomatis tersimpan ke Master Bahan Baku.
+                  <p className="text-[11px] sm:text-xs text-slate-500">
+                    Bahan baru otomatis tersimpan ke Master Bahan Baku.
                   </p>
                 </div>
               </div>
@@ -393,9 +522,9 @@ export default function Rab() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={submitBatch} className="flex-1 overflow-y-auto p-6 space-y-6">
+            <form onSubmit={submitBatch} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Header Input: Tanggal & Pelanggan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                     <Calendar size={14} className="text-teal-600" /> Tanggal RAB *
@@ -415,28 +544,43 @@ export default function Rab() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                     <Users size={14} className="text-teal-600" /> Pelanggan / SPPG *
                   </label>
-                  <select
-                    required
-                    className="input"
-                    value={batchHeader.customer_id}
-                    onChange={(e) =>
+                  <AsyncSelect
+                    cacheOptions
+                    defaultOptions={customerOptions}
+                    loadOptions={loadCustomerOptions}
+                    value={
+                      batchHeader.customer_id
+                        ? {
+                            value: batchHeader.customer_id,
+                            label:
+                              customers.find(
+                                (c) =>
+                                  c.id === batchHeader.customer_id ||
+                                  c.id === +batchHeader.customer_id
+                              )?.name || "Pilih Pelanggan / SPPG...",
+                          }
+                        : null
+                    }
+                    onChange={(opt) => {
                       setBatchHeader({
                         ...batchHeader,
-                        customer_id: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">-- Pilih Pelanggan --</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                        customer_id: opt ? opt.value : "",
+                      });
+                      if (opt?.data && !customers.some((c) => c.id === opt.data.id)) {
+                        setCustomers((prev) => [...prev, opt.data]);
+                      }
+                    }}
+                    placeholder="Pilih atau cari Pelanggan / SPPG..."
+                    menuPosition="fixed"
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                    styles={creatableSelectStyles}
+                    noOptionsMessage={() => "Data pelanggan tidak ditemukan"}
+                    loadingMessage={() => "Mencari..."}
+                  />
                 </div>
               </div>
 
-              {/* Items List (Multi-Item Table) */}
+              {/* Items List (Mobile Cards vs Desktop Table) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -447,16 +591,169 @@ export default function Rab() {
                   </span>
                 </div>
 
-                {/* Table Layout on Desktop, Card on Mobile */}
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                  <table className="w-full text-left text-sm min-w-[760px]">
+                {/* --- 1. TAMPILAN MOBILE: KARTU PER ITEM (md:hidden) --- */}
+                <div className="space-y-3 md:hidden">
+                  {batchItems.map((row, idx) => {
+                    const lineTotal =
+                      (parseFloat(row.qty) || 0) * (parseFloat(row.price) || 0);
+
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3"
+                      >
+                        {/* Header Item & Tombol Hapus */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-50 text-[11px] font-black text-teal-700">
+                              {idx + 1}
+                            </span>
+                            Item Bahan
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => removeBatchRow(idx)}
+                            disabled={batchItems.length <= 1}
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
+                              batchItems.length <= 1
+                                ? "opacity-30 cursor-not-allowed"
+                                : "hover:bg-rose-50 hover:text-rose-600"
+                            }`}
+                            title="Hapus baris item"
+                          >
+                            &times;
+                          </button>
+                        </div>
+
+                        {/* Uraian / Nama Bahan */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                            Uraian / Nama Bahan *
+                          </label>
+                          <AsyncCreatableSelect
+                            defaultOptions={materialOptions}
+                            loadOptions={loadMaterialOptions}
+                            value={
+                              row.item_name
+                                ? { value: row.item_name, label: row.item_name }
+                                : null
+                            }
+                            onChange={(opt) => handleMaterialSelect(idx, opt)}
+                            onCreateOption={(val) => handleCreateMaterial(idx, val)}
+                            formatCreateLabel={(val) => `+ Tambah baru: "${val}"`}
+                            placeholder="Pilih atau ketik nama bahan..."
+                            menuPosition="fixed"
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                            styles={creatableSelectStyles}
+                            noOptionsMessage={() => "Ketik nama untuk buat baru"}
+                            isClearable
+                          />
+                        </div>
+
+                        {/* Supplier */}
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                            Toko / Supplier *
+                          </label>
+                          <AsyncSelect
+                            cacheOptions
+                            defaultOptions={supplierOptions}
+                            loadOptions={loadSupplierOptions}
+                            value={
+                              row.supplier_id
+                                ? {
+                                    value: row.supplier_id,
+                                    label:
+                                      suppliers.find(
+                                        (s) =>
+                                          s.id === row.supplier_id ||
+                                          s.id === +row.supplier_id
+                                      )?.name || "Pilih Supplier...",
+                                  }
+                                : null
+                            }
+                            onChange={(opt) => {
+                              updateBatchRow(idx, "supplier_id", opt ? opt.value : "");
+                              if (opt?.data && !suppliers.some((s) => s.id === opt.data.id)) {
+                                setSuppliers((prev) => [...prev, opt.data]);
+                              }
+                            }}
+                            placeholder="Pilih Supplier..."
+                            menuPosition="fixed"
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                            styles={creatableSelectStyles}
+                            noOptionsMessage={() => "Supplier tidak ditemukan"}
+                            loadingMessage={() => "Mencari..."}
+                          />
+                        </div>
+
+                        {/* Satuan, Qty, Harga in 3-column grid */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                              Satuan
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="kg"
+                              className="input !py-1.5 !px-2 text-xs"
+                              value={row.unit}
+                              onChange={(e) => updateBatchRow(idx, "unit", e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                              Qty *
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0.01"
+                              required
+                              className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                              value={row.qty}
+                              onChange={(e) => updateBatchRow(idx, "qty", e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                              Harga *
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              required
+                              className="input !py-1.5 !px-2 text-xs font-semibold text-right"
+                              value={row.price}
+                              onChange={(e) => updateBatchRow(idx, "price", e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Subtotal Item */}
+                        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs border border-slate-100">
+                          <span className="font-medium text-slate-500">Subtotal:</span>
+                          <span className="font-bold text-teal-800">{rupiah(lineTotal)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* --- 2. TAMPILAN DESKTOP: TABEL MULTI-KOLOM (hidden md:block) --- */}
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full text-left text-sm min-w-[820px]">
                     <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3 w-10 text-center">No</th>
                         <th className="py-2.5 px-3 min-w-[240px]">
                           Uraian / Nama Bahan *
                         </th>
-                        <th className="py-2.5 px-3 w-48">Supplier *</th>
+                        <th className="py-2.5 px-3 min-w-[220px]">Supplier *</th>
                         <th className="py-2.5 px-3 w-24">Satuan</th>
                         <th className="py-2.5 px-3 w-24">Qty *</th>
                         <th className="py-2.5 px-3 w-32">Harga (Rp) *</th>
@@ -475,11 +772,10 @@ export default function Rab() {
                               {idx + 1}
                             </td>
 
-                            {/* Uraian dengan AsyncCreatableSelect (Cari dari master / ketik manual) */}
+                            {/* Uraian dengan AsyncCreatableSelect */}
                             <td className="py-2 px-3">
                               <AsyncCreatableSelect
-                                cacheOptions
-                                defaultOptions
+                                defaultOptions={materialOptions}
                                 loadOptions={loadMaterialOptions}
                                 value={
                                   row.item_name
@@ -487,30 +783,67 @@ export default function Rab() {
                                     : null
                                 }
                                 onChange={(opt) => handleMaterialSelect(idx, opt)}
+                                onCreateOption={(val) => handleCreateMaterial(idx, val)}
                                 formatCreateLabel={(val) => `+ Tambah baru: "${val}"`}
                                 placeholder="Pilih atau ketik bahan..."
+                                menuPosition="fixed"
+                                menuPortalTarget={
+                                  typeof document !== "undefined"
+                                    ? document.body
+                                    : null
+                                }
                                 styles={creatableSelectStyles}
                                 noOptionsMessage={() => "Ketik nama untuk buat baru"}
+                                isClearable
                               />
                             </td>
 
-                            {/* Supplier */}
+                            {/* Supplier dengan AsyncSelect */}
                             <td className="py-2 px-3">
-                              <select
-                                required
-                                className="input !py-1.5 !px-2 text-xs"
-                                value={row.supplier_id}
-                                onChange={(e) =>
-                                  updateBatchRow(idx, "supplier_id", e.target.value)
+                              <AsyncSelect
+                                cacheOptions
+                                defaultOptions={supplierOptions}
+                                loadOptions={loadSupplierOptions}
+                                value={
+                                  row.supplier_id
+                                    ? {
+                                        value: row.supplier_id,
+                                        label:
+                                          suppliers.find(
+                                            (s) =>
+                                              s.id === row.supplier_id ||
+                                              s.id === +row.supplier_id
+                                          )?.name || "Pilih Supplier...",
+                                      }
+                                    : null
                                 }
-                              >
-                                <option value="">-- Supplier --</option>
-                                {suppliers.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(opt) => {
+                                  updateBatchRow(
+                                    idx,
+                                    "supplier_id",
+                                    opt ? opt.value : ""
+                                  );
+                                  if (
+                                    opt?.data &&
+                                    !suppliers.some((s) => s.id === opt.data.id)
+                                  ) {
+                                    setSuppliers((prev) => [
+                                      ...prev,
+                                      opt.data,
+                                    ]);
+                                  }
+                                }}
+                                placeholder="Pilih Supplier..."
+                                menuPosition="fixed"
+                                menuPortalTarget={
+                                  typeof document !== "undefined"
+                                    ? document.body
+                                    : null
+                                }
+                                styles={creatableSelectStyles}
+                                noOptionsMessage={() => "Supplier tidak ditemukan"}
+                                loadingMessage={() => "Mencari..."}
+                              />
                             </td>
 
                             {/* Satuan */}
@@ -588,23 +921,23 @@ export default function Rab() {
                 <button
                   type="button"
                   onClick={addBatchRow}
-                  className="btn-ghost flex items-center gap-1.5 text-xs font-bold text-teal-800 hover:text-teal-900 border-dashed"
+                  className="btn-ghost flex items-center justify-center gap-1.5 text-xs font-bold text-teal-800 hover:text-teal-900 border-dashed w-full sm:w-auto py-2.5"
                 >
                   <Plus size={15} /> Tambah Item
                 </button>
               </div>
 
               {/* Grand Total & Action Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-5">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-4 sm:pt-5">
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                   <div className="text-xs text-slate-500">
-                    Total: <b>{batchItems.length}</b> Item Bahan
+                    Total: <b>{batchItems.length}</b> Bahan
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-600">
-                      Total Nilai RAB:
+                      Total Nilai:
                     </span>
-                    <span className="text-xl font-black text-teal-800">
+                    <span className="text-lg sm:text-xl font-black text-teal-800">
                       {rupiah(batchGrandTotal)}
                     </span>
                   </div>
@@ -621,7 +954,7 @@ export default function Rab() {
                   <button
                     type="submit"
                     disabled={savingBatch}
-                    className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2"
+                    className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 py-2.5"
                   >
                     {savingBatch ? "Menyimpan..." : "Simpan Semua Item RAB"}
                   </button>
