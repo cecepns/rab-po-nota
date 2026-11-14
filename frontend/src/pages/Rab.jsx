@@ -52,8 +52,8 @@ const creatableSelectStyles = {
     backgroundColor: state.isSelected
       ? "#0f766e"
       : state.isFocused
-      ? "#f0fdfa"
-      : "#ffffff",
+        ? "#f0fdfa"
+        : "#ffffff",
     color: state.isSelected ? "#ffffff" : "#1e293b",
     fontSize: "0.875rem",
     cursor: "pointer",
@@ -143,12 +143,12 @@ export default function Rab() {
     api
       .get(E.SUPPLIERS.LIST, { params: { limit: 100 } })
       .then((r) => setSuppliers(r.data?.data || []))
-      .catch(() => {});
+      .catch(() => { });
 
     api
       .get(E.CUSTOMERS.LIST, { params: { limit: 100 } })
       .then((r) => setCustomers(r.data?.data || []))
-      .catch(() => {});
+      .catch(() => { });
 
     fetchMaterials();
   }, [fetchMaterials]);
@@ -268,7 +268,7 @@ export default function Rab() {
         const res = await api.get(E.CUSTOMERS.LIST, { params: { limit: 100 } });
         currCust = res.data?.data || [];
         setCustomers(currCust);
-      } catch {}
+      } catch { }
     }
     let currSupp = suppliers;
     if (!currSupp.length) {
@@ -276,7 +276,7 @@ export default function Rab() {
         const res = await api.get(E.SUPPLIERS.LIST, { params: { limit: 100 } });
         currSupp = res.data?.data || [];
         setSuppliers(currSupp);
-      } catch {}
+      } catch { }
     }
 
     setBatchHeader({
@@ -606,9 +606,9 @@ export default function Rab() {
                     }
                   />
                 </div>
-                <div className="text-xs text-slate-500 sm:text-right">
+                {/* <div className="text-xs text-slate-500 sm:text-right">
                   Pilih <b>Pelanggan / SPPG</b> di kolom pertama setiap baris item di bawah. Baris baru otomatis mengikuti pelanggan sebelumnya.
-                </div>
+                </div> */}
               </div>
 
               {/* Items List (Mobile Cards vs Desktop Table) */}
@@ -655,11 +655,10 @@ export default function Rab() {
                               type="button"
                               onClick={() => removeBatchRow(idx)}
                               disabled={batchItems.length <= 1}
-                              className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
-                                batchItems.length <= 1
+                              className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${batchItems.length <= 1
                                   ? "opacity-30 cursor-not-allowed"
                                   : "hover:bg-rose-50 hover:text-rose-600"
-                              }`}
+                                }`}
                               title="Hapus baris item"
                             >
                               &times;
@@ -679,14 +678,14 @@ export default function Rab() {
                             value={
                               row.customer_id
                                 ? {
-                                    value: row.customer_id,
-                                    label:
-                                      customers.find(
-                                        (c) =>
-                                          c.id === row.customer_id ||
-                                          c.id === +row.customer_id
-                                      )?.name || "Pilih Pelanggan...",
-                                  }
+                                  value: row.customer_id,
+                                  label:
+                                    customers.find(
+                                      (c) =>
+                                        c.id === row.customer_id ||
+                                        c.id === +row.customer_id
+                                    )?.name || "Pilih Pelanggan...",
+                                }
                                 : null
                             }
                             onChange={(opt) => {
@@ -741,14 +740,14 @@ export default function Rab() {
                             value={
                               row.supplier_id
                                 ? {
-                                    value: row.supplier_id,
-                                    label:
-                                      suppliers.find(
-                                        (s) =>
-                                          s.id === row.supplier_id ||
-                                          s.id === +row.supplier_id
-                                      )?.name || "Pilih Supplier...",
-                                  }
+                                  value: row.supplier_id,
+                                  label:
+                                    suppliers.find(
+                                      (s) =>
+                                        s.id === row.supplier_id ||
+                                        s.id === +row.supplier_id
+                                    )?.name || "Pilih Supplier...",
+                                }
                                 : null
                             }
                             onChange={(opt) => {
@@ -860,14 +859,14 @@ export default function Rab() {
                                 value={
                                   row.customer_id
                                     ? {
-                                        value: row.customer_id,
-                                        label:
-                                          customers.find(
-                                            (c) =>
-                                              c.id === row.customer_id ||
-                                              c.id === +row.customer_id
-                                          )?.name || "Pilih Pelanggan...",
-                                      }
+                                      value: row.customer_id,
+                                      label:
+                                        customers.find(
+                                          (c) =>
+                                            c.id === row.customer_id ||
+                                            c.id === +row.customer_id
+                                        )?.name || "Pilih Pelanggan...",
+                                    }
                                     : null
                                 }
                                 onChange={(opt) => {
@@ -931,14 +930,14 @@ export default function Rab() {
                                 value={
                                   row.supplier_id
                                     ? {
-                                        value: row.supplier_id,
-                                        label:
-                                          suppliers.find(
-                                            (s) =>
-                                              s.id === row.supplier_id ||
-                                              s.id === +row.supplier_id
-                                          )?.name || "Pilih Supplier...",
-                                      }
+                                      value: row.supplier_id,
+                                      label:
+                                        suppliers.find(
+                                          (s) =>
+                                            s.id === row.supplier_id ||
+                                            s.id === +row.supplier_id
+                                        )?.name || "Pilih Supplier...",
+                                    }
                                     : null
                                 }
                                 onChange={(opt) => {
@@ -1034,11 +1033,10 @@ export default function Rab() {
                                   onClick={() => removeBatchRow(idx)}
                                   disabled={batchItems.length <= 1}
                                   title="Hapus baris"
-                                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${
-                                    batchItems.length <= 1
+                                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition ${batchItems.length <= 1
                                       ? "opacity-30 cursor-not-allowed"
                                       : "hover:bg-rose-50 hover:text-rose-600"
-                                  }`}
+                                    }`}
                                 >
                                   &times;
                                 </button>
