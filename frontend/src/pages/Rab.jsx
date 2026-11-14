@@ -69,6 +69,27 @@ const creatableSelectStyles = {
     fontWeight: 600,
     fontSize: "0.875rem",
   }),
+  multiValue: (base) => ({
+    ...base,
+    backgroundColor: "#ccfbf1",
+    borderRadius: "0.5rem",
+    padding: "1px 4px",
+  }),
+  multiValueLabel: (base) => ({
+    ...base,
+    color: "#0f766e",
+    fontWeight: 700,
+    fontSize: "0.75rem",
+  }),
+  multiValueRemove: (base) => ({
+    ...base,
+    color: "#0f766e",
+    borderRadius: "0.375rem",
+    "&:hover": {
+      backgroundColor: "#0f766e",
+      color: "#ffffff",
+    },
+  }),
 };
 
 export default function Rab() {
@@ -81,7 +102,7 @@ export default function Rab() {
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchHeader, setBatchHeader] = useState({
     date: today(),
-    customer_id: "",
+    customer_ids: [],
   });
   const [batchItems, setBatchItems] = useState([
     { item_name: "", supplier_id: "", qty: 1, unit: "kg", price: 0 },
@@ -235,7 +256,7 @@ export default function Rab() {
     fetchMaterials();
     setBatchHeader({
       date: today(),
-      customer_id: customers[0]?.id || "",
+      customer_ids: customers.length ? [customers[0].id] : [],
     });
     setBatchItems([
       {
@@ -319,8 +340,8 @@ export default function Rab() {
   // Simpan Batch RAB
   const submitBatch = async (e) => {
     e.preventDefault();
-    if (!batchHeader.customer_id) {
-      alert("Silakan pilih Pelanggan");
+    if (!batchHeader.customer_ids || !batchHeader.customer_ids.length) {
+      alert("Silakan pilih minimal 1 Pelanggan / SPPG");
       return;
     }
 
@@ -333,14 +354,15 @@ export default function Rab() {
     }
 
     setSavingBatch(true);
+    const totalItems = batchItems.length * batchHeader.customer_ids.length;
     const res = await request(
       () =>
         api.post(E.RAB.BATCH, {
           date: batchHeader.date,
-          customer_id: batchHeader.customer_id,
+          customer_ids: batchHeader.customer_ids,
           items: batchItems,
         }),
-      `${batchItems.length} item RAB berhasil disimpan & dicatat ke master bahan baku!`
+      `Berhasil menyimpan ${totalItems} item RAB untuk ${batchHeader.customer_ids.length} pelanggan!`
     );
     setSavingBatch(false);
 
@@ -390,11 +412,13 @@ export default function Rab() {
     }
   };
 
-  // Grand Total perhitungan di batch modal
-  const batchGrandTotal = batchItems.reduce(
+  // Grand Total perhitungan di batch modal (dikalikan jumlah pelanggan terpilih)
+  const singleBatchTotal = batchItems.reduce(
     (sum, it) => sum + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0),
     0
   );
+  const batchGrandTotal =
+    singleBatchTotal * (batchHeader.customer_ids?.length || 1);
 
   const customerOptions = customers.map((c) => ({
     value: c.id,
@@ -541,36 +565,65 @@ export default function Rab() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <Users size={14} className="text-teal-600" /> Pelanggan / SPPG *
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                      <Users size={14} className="text-teal-600" /> Pelanggan / SPPG *
+                      {batchHeader.customer_ids.length > 0 && (
+                        <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-800">
+                          {batchHeader.customer_ids.length} dipilih
+                        </span>
+                      )}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBatchHeader({
+                            ...batchHeader,
+                            customer_ids: customers.map((c) => c.id),
+                          })
+                        }
+                        className="text-[11px] font-bold text-teal-700 hover:text-teal-800 hover:underline"
+                      >
+                        Pilih Semua
+                      </button>
+                      {batchHeader.customer_ids.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBatchHeader({
+                              ...batchHeader,
+                              customer_ids: [],
+                            })
+                          }
+                          className="text-[11px] font-semibold text-slate-400 hover:text-rose-600"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <AsyncSelect
+                    isMulti
                     cacheOptions
                     defaultOptions={customerOptions}
                     loadOptions={loadCustomerOptions}
-                    value={
-                      batchHeader.customer_id
-                        ? {
-                            value: batchHeader.customer_id,
-                            label:
-                              customers.find(
-                                (c) =>
-                                  c.id === batchHeader.customer_id ||
-                                  c.id === +batchHeader.customer_id
-                              )?.name || "Pilih Pelanggan / SPPG...",
-                          }
-                        : null
-                    }
-                    onChange={(opt) => {
+                    value={customerOptions.filter((c) =>
+                      batchHeader.customer_ids.includes(c.value)
+                    )}
+                    onChange={(opts) => {
+                      const ids = (opts || []).map((o) => o.value);
                       setBatchHeader({
                         ...batchHeader,
-                        customer_id: opt ? opt.value : "",
+                        customer_ids: ids,
                       });
-                      if (opt?.data && !customers.some((c) => c.id === opt.data.id)) {
-                        setCustomers((prev) => [...prev, opt.data]);
-                      }
+                      (opts || []).forEach((opt) => {
+                        if (opt?.data && !customers.some((c) => c.id === opt.data.id)) {
+                          setCustomers((prev) => [...prev, opt.data]);
+                        }
+                      });
                     }}
-                    placeholder="Pilih atau cari Pelanggan / SPPG..."
+                    placeholder="Pilih atau cari satu / beberapa Pelanggan..."
                     menuPosition="fixed"
                     menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                     styles={creatableSelectStyles}
@@ -929,9 +982,15 @@ export default function Rab() {
 
               {/* Grand Total & Action Bar */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-4 sm:pt-5">
-                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full sm:w-auto gap-2 sm:gap-6">
                   <div className="text-xs text-slate-500">
                     Total: <b>{batchItems.length}</b> Bahan
+                    {batchHeader.customer_ids.length > 1 && (
+                      <span className="ml-1 text-teal-800 font-semibold">
+                        &times; <b>{batchHeader.customer_ids.length}</b> Pelanggan ={" "}
+                        <b>{batchItems.length * batchHeader.customer_ids.length}</b> Item
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-600">
@@ -956,7 +1015,11 @@ export default function Rab() {
                     disabled={savingBatch}
                     className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 py-2.5"
                   >
-                    {savingBatch ? "Menyimpan..." : "Simpan Semua Item RAB"}
+                    {savingBatch
+                      ? "Menyimpan..."
+                      : batchHeader.customer_ids.length > 1
+                      ? `Simpan (${batchHeader.customer_ids.length} Pelanggan)`
+                      : "Simpan Semua Item RAB"}
                   </button>
                 </div>
               </div>

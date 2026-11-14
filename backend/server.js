@@ -345,15 +345,24 @@ app.delete(
   }),
 );
 
-// ---------- RAB Batch (Multi-Item Input) ----------
+// ---------- RAB Batch (Multi-Item & Multi-Customer Input) ----------
 app.post(
   '/api/rab/batch',
   auth,
   wrap(async (req, res) => {
-    const { date, customer_id, items } = req.body;
-    if (!date || !customer_id) {
-      throw fail(400, 'Tanggal dan pelanggan wajib diisi');
+    const { date, customer_id, customer_ids, items } = req.body;
+    if (!date) {
+      throw fail(400, 'Tanggal RAB wajib diisi');
     }
+
+    // Mendukung multi pelanggan dari header atau per baris item
+    let cIds = [];
+    if (Array.isArray(customer_ids) && customer_ids.length > 0) {
+      cIds = customer_ids.map(Number).filter(Boolean);
+    } else if (customer_id) {
+      cIds = [+customer_id].filter(Boolean);
+    }
+
     if (!Array.isArray(items) || items.length === 0) {
       throw fail(400, 'Daftar item RAB minimal 1 baris');
     }
@@ -361,6 +370,8 @@ app.post(
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
+
+      let totalInserted = 0;
 
       for (const it of items) {
         const item_name = clean(it.item_name);
@@ -380,11 +391,24 @@ app.post(
           throw fail(400, `Harga untuk "${item_name}" tidak valid`);
         }
 
-        // Simpan ke rab_items
-        await conn.query(
-          'INSERT INTO rab_items (date, customer_id, supplier_id, item_name, qty, unit, price) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [date, customer_id, supplier_id, item_name, qty, unit, price],
-        );
+        // Simpan ke rab_items untuk pelanggan terpilih (per baris atau dari header)
+        const targetCustomers = it.customer_id
+          ? [+it.customer_id]
+          : cIds.length
+          ? cIds
+          : [];
+
+        if (!targetCustomers.length) {
+          throw fail(400, `Pelanggan untuk "${item_name}" wajib dipilih`);
+        }
+
+        for (const cId of targetCustomers) {
+          await conn.query(
+            'INSERT INTO rab_items (date, customer_id, supplier_id, item_name, qty, unit, price) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [date, cId, supplier_id, item_name, qty, unit, price],
+          );
+          totalInserted++;
+        }
 
         // Auto-save / update ke master data bahan baku (materials)
         await conn.query(
@@ -399,7 +423,7 @@ app.post(
       }
 
       await conn.commit();
-      ok(res, { count: items.length });
+      ok(res, { count: totalInserted });
     } catch (e) {
       await conn.rollback();
       throw e;
