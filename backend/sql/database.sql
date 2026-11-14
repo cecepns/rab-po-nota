@@ -10,8 +10,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS suppliers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
-  address VARCHAR(255) NULL,
+  nib VARCHAR(60) NULL,
+  pic_name VARCHAR(120) NULL,
   phone VARCHAR(30) NULL,
+  bank_name VARCHAR(60) NULL,
+  bank_account_no VARCHAR(60) NULL,
+  bank_account_name VARCHAR(120) NULL,
+  address VARCHAR(255) NULL,
+  notes TEXT NULL,
   logo VARCHAR(120) NULL,
   signature VARCHAR(120) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -69,6 +75,16 @@ CREATE TABLE IF NOT EXISTS nota_items (
   FOREIGN KEY (nota_id) REFERENCES notas(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS materials (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL UNIQUE,
+  unit VARCHAR(30) NULL,
+  price DECIMAL(14,2) NOT NULL DEFAULT 0,
+  default_supplier_id INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (default_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+);
+
 -- Sample data (user admin dibuat otomatis oleh server.js dari .env)
 INSERT INTO suppliers (name,address,phone) VALUES
  ('TOKO FARSYHA KENCANA','Serang, Banten','0800000001'),
@@ -79,3 +95,7 @@ INSERT INTO rab_items (date,customer_id,supplier_id,item_name,qty,unit,price) VA
  (CURDATE(),1,1,'Beras putih (premium)',150,'kg',15400),
  (CURDATE(),1,2,'Wortel',42,'kg',19000),
  (CURDATE(),2,3,'Minyak goreng sawit',50,'liter',23000);
+INSERT IGNORE INTO materials (name, unit, price, default_supplier_id) VALUES
+ ('Beras putih (premium)', 'kg', 15400, 1),
+ ('Wortel', 'kg', 19000, 2),
+ ('Minyak goreng sawit', 'liter', 23000, 3);

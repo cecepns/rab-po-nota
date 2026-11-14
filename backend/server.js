@@ -97,10 +97,27 @@ const R = {
     table: 'suppliers',
     from: 'suppliers t',
     select: 't.*',
-    cols: ['name', 'address', 'phone'],
+    cols: [
+      'name',
+      'nib',
+      'pic_name',
+      'phone',
+      'bank_name',
+      'bank_account_no',
+      'bank_account_name',
+      'address',
+      'notes',
+    ],
     files: ['logo', 'signature'],
     req: ['name'],
-    search: ['t.name', 't.phone'],
+    search: [
+      't.name',
+      't.phone',
+      't.pic_name',
+      't.bank_account_no',
+      't.bank_name',
+      't.bank_account_name',
+    ],
     sort: ['id', 'name'],
   },
   customers: {
@@ -111,6 +128,16 @@ const R = {
     req: ['name'],
     search: ['t.name', 't.phone'],
     sort: ['id', 'name'],
+  },
+  materials: {
+    table: 'materials',
+    from: 'materials t LEFT JOIN suppliers s ON s.id=t.default_supplier_id',
+    select: 't.*, s.name default_supplier_name',
+    cols: ['name', 'unit', 'price', 'default_supplier_id'],
+    req: ['name'],
+    num: ['price'],
+    search: ['t.name', 't.unit'],
+    sort: ['id', 'name', 'price'],
   },
   rab: {
     table: 'rab_items',
@@ -314,6 +341,70 @@ app.delete(
   }),
 );
 
+// ---------- RAB Batch (Multi-Item Input) ----------
+app.post(
+  '/api/rab/batch',
+  auth,
+  wrap(async (req, res) => {
+    const { date, customer_id, items } = req.body;
+    if (!date || !customer_id) {
+      throw fail(400, 'Tanggal dan pelanggan wajib diisi');
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      throw fail(400, 'Daftar item RAB minimal 1 baris');
+    }
+
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      for (const it of items) {
+        const item_name = clean(it.item_name);
+        const supplier_id = +it.supplier_id;
+        const qty = +it.qty;
+        const unit = clean(it.unit) || '';
+        const price = +it.price;
+
+        if (!item_name) throw fail(400, 'Nama bahan/uraian wajib diisi');
+        if (!supplier_id) {
+          throw fail(400, `Supplier untuk "${item_name}" wajib dipilih`);
+        }
+        if (isNaN(qty) || qty <= 0) {
+          throw fail(400, `Qty untuk "${item_name}" tidak valid`);
+        }
+        if (isNaN(price) || price < 0) {
+          throw fail(400, `Harga untuk "${item_name}" tidak valid`);
+        }
+
+        // Simpan ke rab_items
+        await conn.query(
+          'INSERT INTO rab_items (date, customer_id, supplier_id, item_name, qty, unit, price) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [date, customer_id, supplier_id, item_name, qty, unit, price],
+        );
+
+        // Auto-save / update ke master data bahan baku (materials)
+        await conn.query(
+          `INSERT INTO materials (name, unit, price, default_supplier_id)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             unit = VALUES(unit),
+             price = VALUES(price),
+             default_supplier_id = VALUES(default_supplier_id)`,
+          [item_name, unit, price, supplier_id],
+        );
+      }
+
+      await conn.commit();
+      ok(res, { count: items.length });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  }),
+);
+
 // ---------- PO / Nota / Report ----------
 app.post(
   '/api/pos/generate',
@@ -389,7 +480,7 @@ app.get(
   auth,
   wrap(async (req, res) => {
     const [[nota]] = await db.query(
-      'SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.logo, s.signature, p.po_no FROM notas n JOIN suppliers s ON s.id=n.supplier_id JOIN pos p ON p.id=n.po_id WHERE n.id=?',
+      'SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no FROM notas n JOIN suppliers s ON s.id=n.supplier_id JOIN pos p ON p.id=n.po_id WHERE n.id=?',
       [req.params.id],
     );
     if (!nota) throw fail(404, 'Nota tidak ditemukan');
@@ -494,6 +585,20 @@ app.post(
     const o = values(req.c, req);
     validate(req.c, o);
     const [r] = await db.query(`INSERT INTO ${req.c.table} SET ?`, [o]);
+
+    // Jika input manual ke rab, otomatis simpan/update ke master materials
+    if (req.params.r === 'rab' && o.item_name) {
+      await db.query(
+        `INSERT INTO materials (name, unit, price, default_supplier_id)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           unit = COALESCE(VALUES(unit), unit),
+           price = COALESCE(VALUES(price), price),
+           default_supplier_id = COALESCE(VALUES(default_supplier_id), default_supplier_id)`,
+        [o.item_name, o.unit || null, o.price || 0, o.supplier_id || null],
+      );
+    }
+
     ok(res, { id: r.insertId });
   }),
 );
@@ -509,6 +614,20 @@ app.put(
     validate(req.c, o, true);
     if (!Object.keys(o).length) throw fail(400, 'Tidak ada data diubah');
     await db.query(`UPDATE ${req.c.table} SET ? WHERE id=?`, [o, req.params.id]);
+
+    // Jika update data rab, update juga ke master materials
+    if (req.params.r === 'rab' && o.item_name) {
+      await db.query(
+        `INSERT INTO materials (name, unit, price, default_supplier_id)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           unit = COALESCE(VALUES(unit), unit),
+           price = COALESCE(VALUES(price), price),
+           default_supplier_id = COALESCE(VALUES(default_supplier_id), default_supplier_id)`,
+        [o.item_name, o.unit || null, o.price || 0, o.supplier_id || null],
+      );
+    }
+
     ok(res, true);
   }),
 );
@@ -539,6 +658,51 @@ app.use((e, req, res, next) => {
 });
 
 (async () => {
+  // Pastikan kolom baru di suppliers (PIC, NIB, Rekening Bank, Catatan) tersedia
+  try {
+    const [supplierCols] = await db.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'suppliers'
+    `);
+    const existingColNames = (supplierCols || []).map((c) => c.COLUMN_NAME);
+
+    const supplierColsToAdd = [
+      { name: 'nib', sql: 'ALTER TABLE suppliers ADD COLUMN nib VARCHAR(60) NULL AFTER name' },
+      { name: 'pic_name', sql: 'ALTER TABLE suppliers ADD COLUMN pic_name VARCHAR(120) NULL AFTER nib' },
+      { name: 'bank_name', sql: 'ALTER TABLE suppliers ADD COLUMN bank_name VARCHAR(60) NULL AFTER phone' },
+      { name: 'bank_account_no', sql: 'ALTER TABLE suppliers ADD COLUMN bank_account_no VARCHAR(60) NULL AFTER bank_name' },
+      { name: 'bank_account_name', sql: 'ALTER TABLE suppliers ADD COLUMN bank_account_name VARCHAR(120) NULL AFTER bank_account_no' },
+      { name: 'notes', sql: 'ALTER TABLE suppliers ADD COLUMN notes TEXT NULL AFTER address' },
+    ];
+
+    for (const col of supplierColsToAdd) {
+      if (!existingColNames.includes(col.name)) {
+        await db.query(col.sql);
+      }
+    }
+  } catch (err) {
+    console.error('Migration suppliers warning:', err.message);
+  }
+
+  // Pastikan tabel materials tersedia
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS materials (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(150) NOT NULL UNIQUE,
+      unit VARCHAR(30) NULL,
+      price DECIMAL(14,2) NOT NULL DEFAULT 0,
+      default_supplier_id INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (default_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Populasikan data awal materials dari rab_items yang sudah ada
+  await db.query(`
+    INSERT IGNORE INTO materials (name, unit, price, default_supplier_id)
+    SELECT item_name, unit, price, supplier_id FROM rab_items ORDER BY id DESC
+  `);
+
   const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users');
   if (!n) {
     await db.query('INSERT INTO users SET ?', [

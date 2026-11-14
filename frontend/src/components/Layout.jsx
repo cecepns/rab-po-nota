@@ -14,6 +14,7 @@ import {
   UserCheck,
   UserCog,
   ChevronRight,
+  Carrot,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 
@@ -36,6 +37,7 @@ const SECTIONS = [
   {
     title: "MASTER",
     items: [
+      { to: "/materials", label: "Bahan Baku", icon: Carrot },
       { to: "/suppliers", label: "Toko / Supplier", icon: Store },
       { to: "/customers", label: "Pelanggan", icon: Users },
       { to: "/users", label: "Pengguna", icon: UserCog },

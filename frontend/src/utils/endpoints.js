@@ -3,7 +3,8 @@ export const API_ENDPOINTS = {
   USERS: { LIST: "/users", DETAIL: (id) => `/users/${id}` },
   SUPPLIERS: { LIST: "/suppliers", DETAIL: (id) => `/suppliers/${id}` },
   CUSTOMERS: { LIST: "/customers", DETAIL: (id) => `/customers/${id}` },
-  RAB: { LIST: "/rab", DETAIL: (id) => `/rab/${id}` },
+  MATERIALS: { LIST: "/materials", DETAIL: (id) => `/materials/${id}` },
+  RAB: { LIST: "/rab", DETAIL: (id) => `/rab/${id}`, BATCH: "/rab/batch" },
   PO: { LIST: "/pos", DETAIL: (id) => `/pos/${id}`, GENERATE: "/pos/generate" },
   NOTA: {
     LIST: "/notas",

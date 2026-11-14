@@ -54,9 +54,22 @@ export default function CrudPage({ title, list, detail, columns, fields, initial
         )}
       />
       <Modal open={!!modal} title={modal?.id ? `Edit ${title}` : `Tambah ${title}`} onClose={() => setModal(null)}>
-        <form onSubmit={submit} className="space-y-3">
-          {fields.map((f) => <Field key={f.name} field={f} value={form[f.name]} onChange={(v) => setForm({ ...form, [f.name]: v })} />)}
-          <div className="flex justify-end gap-2 pt-2">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {fields.map((f) => (
+              <div
+                key={f.name}
+                className={f.half ? "md:col-span-1" : "md:col-span-2"}
+              >
+                <Field
+                  field={f}
+                  value={form[f.name]}
+                  onChange={(v) => setForm({ ...form, [f.name]: v })}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Batal</button>
             <button className="btn-primary" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</button>
           </div>

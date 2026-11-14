@@ -177,6 +177,16 @@ export default function Field({ field, value, onChange }) {
         onChange={(e) => onChange(e.target.files[0])}
       />
     );
+  } else if (field.type === "textarea") {
+    input = (
+      <textarea
+        {...common}
+        rows={field.rows || 3}
+        value={value ?? ""}
+        placeholder={field.placeholder || ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
   } else {
     input = (
       <input
@@ -184,6 +194,7 @@ export default function Field({ field, value, onChange }) {
         type={field.type || "text"}
         step={field.type === "number" ? "any" : undefined}
         value={value ?? ""}
+        placeholder={field.placeholder || ""}
         onChange={(e) => onChange(e.target.value)}
       />
     );
@@ -196,6 +207,11 @@ export default function Field({ field, value, onChange }) {
         {field.required && <span className="text-rose-500"> *</span>}
       </span>
       {input}
+      {field.helper && (
+        <span className="mt-1 block text-[11px] text-slate-400">
+          {field.helper}
+        </span>
+      )}
     </label>
   );
 }
