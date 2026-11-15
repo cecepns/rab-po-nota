@@ -25,6 +25,7 @@ export default function Nota() {
           { key: "nota_no", label: "No. Nota" },
           { key: "date", label: "Tanggal" },
           { key: "supplier_name", label: "Supplier" },
+          { key: "customer_name", label: "Pelanggan / SPPG", render: (r) => <span className="font-semibold text-slate-800">{r.customer_name || "-"}</span> },
           { key: "po_no", label: "Ref. PO" },
           { key: "total", label: "Total", render: (r) => <b>{rupiah(r.total)}</b> },
         ]}

@@ -28,14 +28,16 @@ body {
 
 /* Print Styling */
 @media print {
-  html, body, #root, #root > div, main {
+  html, body {
     background: #ffffff !important;
     background-color: #ffffff !important;
-    padding: 0 !important;
     margin: 0 !important;
-  }
-  body {
+    padding: 0 !important;
     color: black !important;
+  }
+  /* Sembunyikan elemen toast, fixed portal, backdrop, dan UI navigasi saat print */
+  [data-hot-toast], .toaster, [role="status"], aside, nav, header {
+    display: none !important;
   }
   .print-hidden {
     display: none !important;

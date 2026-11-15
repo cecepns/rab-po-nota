@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Printer, ArrowLeft, Building2, Download, Palette, Pipette } from "lucide-react";
+import { Printer, ArrowLeft, Building2, Download, Palette, Pipette, Users } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { api } from "@/utils/api";
@@ -154,12 +154,17 @@ export default function NotaDetail() {
   const [currentColor, setCurrentColor] = useState("#1e293b");
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [sigDataUrl, setSigDataUrl] = useState(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
   const load = async () => {
     const res = await request(() => api.get(E.NOTA.FULL(id)));
     if (res?.data) {
       setNota(res.data);
-      // Preload gambar ke Base64 Data URL untuk html2pdf yang anti-error
+      // Jika memiliki daftar multi-pelanggan, langsung aktifkan pelanggan pertama
+      if (res.data.customers && res.data.customers.length > 1) {
+        setSelectedCustomerId(res.data.customers[0].id);
+      }
+      // Preload gambar ke Base64 Data URL untuk html2canvas yang anti-error
       if (res.data.logo) {
         toDataUrl(fileUrl(res.data.logo)).then((d) => setLogoDataUrl(d));
       }
@@ -180,7 +185,6 @@ export default function NotaDetail() {
       if (savedColor) {
         setCurrentColor(savedColor);
       } else {
-        // Cek nama supplier untuk saran warna bawaan jika belum pernah diatur
         const sName = (nota.supplier_name || "").toLowerCase();
         if (sName.includes("rangga") || sName.includes("sayur")) {
           setCurrentColor("#23943d"); // Hijau
@@ -213,6 +217,7 @@ export default function NotaDetail() {
     });
 
   const save = async (it) => {
+    if (!it.id) return;
     if (
       await request(
         () => api.put(E.NOTA.ITEM(it.id), { qty: it.qty, price: it.price }),
@@ -222,7 +227,40 @@ export default function NotaDetail() {
       load();
   };
 
-  // Fungsi Export / Download PDF langsung menggunakan html2canvas + jsPDF (100% kompatibel di semua browser modern)
+  // Logika Multi-Pelanggan:
+  // Jika nota memiliki multi-pelanggan, izinkan memilih pelanggan untuk cetak/download terpisah
+  const hasMultipleCustomers = (nota?.customers?.length || 0) > 1;
+  const activeCustomer =
+    hasMultipleCustomers && selectedCustomerId
+      ? nota.customers.find((c) => c.id === selectedCustomerId)
+      : hasMultipleCustomers
+      ? nota.customers[0]
+      : null;
+
+  const displayedCustomerName = activeCustomer
+    ? activeCustomer.name
+    : nota?.customer_name || "Pelanggan / SPPG";
+
+  const displayedCustomerAddress = activeCustomer
+    ? activeCustomer.address
+    : nota?.customer_address || "";
+
+  // Filter item berdasarkan pelanggan yang dipilih jika nota lama gabungan
+  const displayedItems = (() => {
+    if (!nota) return [];
+    if (!hasMultipleCustomers || !activeCustomer) return nota.items || [];
+    if (nota.customer_items && nota.customer_items.length) {
+      const filtered = nota.customer_items.filter(
+        (it) => it.customer_id === activeCustomer.id
+      );
+      if (filtered.length) return filtered;
+    }
+    return nota.items || [];
+  })();
+
+  const total = displayedItems.reduce((s, x) => s + +x.total, 0);
+
+  // Fungsi Export / Download PDF langsung menggunakan html2canvas + jsPDF
   const handleDownloadPDF = async () => {
     if (!notaRef.current || !nota) return;
     setIsGeneratingPdf(true);
@@ -233,6 +271,7 @@ export default function NotaDetail() {
 
       const element = notaRef.current;
       const cleanNo = (nota.nota_no || "nota").replace(/[\/\\:]/g, "_");
+      const cleanCust = displayedCustomerName.replace(/[\/\\:\s]/g, "_");
 
       // Render elemen ke high-DPI canvas
       const canvas = await html2canvas(element, {
@@ -266,10 +305,9 @@ export default function NotaDetail() {
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
 
       pdf.addImage(imgData, "JPEG", margin, margin, printWidth, renderHeight);
-      pdf.save(`Nota_${cleanNo}.pdf`);
+      pdf.save(`Nota_${cleanNo}_${cleanCust}.pdf`);
     } catch (err) {
       console.error("Gagal export PDF langsung:", err);
-      // Jika terjadi kendala sistem di browser tertentu, gunakan cetak browser
       window.print();
     } finally {
       setIsGeneratingPdf(false);
@@ -283,31 +321,33 @@ export default function NotaDetail() {
       </div>
     );
 
-  const total = nota.items.reduce((s, x) => s + +x.total, 0);
-
   // Jumlah baris minimal 5 agar pas 1 halaman A4 dan tidak tumpah ke page 2
   const minRows = 5;
-  const emptyRowsCount = Math.max(0, minRows - (nota.items?.length || 0));
+  const emptyRowsCount = Math.max(0, minRows - (displayedItems.length || 0));
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 print:max-w-none print:m-0 print:p-0">
-      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4, Background Putih Murni & Memaksa Warna Header Tidak Transparan */}
+      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4, Background Putih Murni & Anti Blank Overlay */}
       <style>{`
         @page {
           size: A4 portrait;
           margin: 7mm 9mm 7mm 9mm;
         }
         @media print {
-          html, body, #root, #root > div, main {
+          html, body {
             background: #ffffff !important;
             background-color: #ffffff !important;
-            padding: 0 !important;
             margin: 0 !important;
+            padding: 0 !important;
           }
           *, *::before, *::after {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+          }
+          /* Sembunyikan elemen fixed, toast, backdrop, modal, dan navbar saat print */
+          [data-hot-toast], .toaster, [role="status"], aside, nav, header {
+            display: none !important;
           }
           .nota-paper {
             background: #ffffff !important;
@@ -362,10 +402,11 @@ export default function NotaDetail() {
                 type="button"
                 onClick={() => changeColor(t.colorHex)}
                 title={`${t.name} (${t.desc})`}
-                className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${currentColor.toLowerCase() === t.colorHex.toLowerCase()
-                  ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
-                  : "hover:opacity-80"
-                  }`}
+                className={`relative flex h-6 w-6 items-center justify-center rounded-lg transition ${
+                  currentColor.toLowerCase() === t.colorHex.toLowerCase()
+                    ? "ring-2 ring-slate-800 ring-offset-1 scale-110 shadow-xs"
+                    : "hover:opacity-80"
+                }`}
                 style={{ backgroundColor: t.colorHex }}
               >
                 {currentColor.toLowerCase() === t.colorHex.toLowerCase() && (
@@ -411,6 +452,43 @@ export default function NotaDetail() {
         </div>
       </div>
 
+      {/* Selector Pelanggan Jika Nota Memiliki Lebih dari 1 Pelanggan */}
+      {hasMultipleCustomers && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-amber-50/90 border border-amber-200/80 px-4 py-2.5 rounded-2xl print:hidden shadow-2xs">
+          <div className="flex items-center gap-2 text-xs text-amber-900 font-bold">
+            <Users size={16} className="text-amber-700 shrink-0" />
+            <span>Nota Terpisah per Pelanggan:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {nota.customers.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedCustomerId(c.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  selectedCustomerId === c.id
+                    ? "bg-amber-700 text-white shadow-xs"
+                    : "bg-white text-slate-700 border border-amber-200 hover:bg-amber-100/60"
+                }`}
+              >
+                <span>{c.name}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelectedCustomerId(null)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                selectedCustomerId === null
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              Semua Item
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Lembar Nota Kontan / Faktur Fisik (100% Putih Bersih tanpa warna abu-abu di cetak & PDF) */}
       <div
         ref={notaRef}
@@ -421,12 +499,12 @@ export default function NotaDetail() {
         } print:rounded-none print:border-0 print:shadow-none print:p-0 print:m-0 print:bg-white`}
         style={{ backgroundColor: "#ffffff" }}
       >
-        {/* Header Nota: Kiri (Kop Toko) & Kanan (Hari, Tanggal, Kepada Yth) */}
+        {/* Header Nota: Kiri (Kop Toko & Catatan Toko) & Kanan (Hari, Tanggal, Kepada Yth & Alamat Pelanggan) */}
         <div
           className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b-2"
           style={theme.borderSolid}
         >
-          {/* Sisi Kiri: Logo & Info Toko */}
+          {/* Sisi Kiri: Logo, Nama Toko, Catatan Toko & Alamat */}
           <div className="flex items-start gap-3.5 flex-1 min-w-0">
             {nota.logo ? (
               <img
@@ -447,6 +525,12 @@ export default function NotaDetail() {
               >
                 {nota.supplier_name}
               </h2>
+              {/* Catatan / Slogan Toko di Bawah Nama Toko (sesuai foto bukti fisik) */}
+              {nota.supplier_notes && (
+                <p className="text-xs font-semibold text-slate-700 italic leading-snug">
+                  {nota.supplier_notes}
+                </p>
+              )}
               {nota.supplier_address && (
                 <p className="text-xs text-slate-600 leading-snug">
                   {nota.supplier_address}
@@ -460,8 +544,8 @@ export default function NotaDetail() {
             </div>
           </div>
 
-          {/* Sisi Kanan: Tanggal & Penerima */}
-          <div className="w-full sm:w-auto text-xs space-y-1 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          {/* Sisi Kanan: Hari, Tanggal, Kepada Yth & Alamat Pelanggan */}
+          <div className="w-full sm:w-auto text-xs space-y-0.5 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
             <div>
               <span className="text-slate-500">Hari, Tanggal: </span>
               <b className="text-slate-900 font-bold">
@@ -471,9 +555,15 @@ export default function NotaDetail() {
             <div>
               <span className="text-slate-500">Kepada Yth. </span>
               <b className="text-slate-900 font-bold">
-                {nota.customer_name || "Pelanggan / SPPG"}
+                {displayedCustomerName}
               </b>
             </div>
+            {/* Alamat Pelanggan dimunculkan */}
+            {displayedCustomerAddress && (
+              <p className="text-[11px] text-slate-600 font-normal leading-tight">
+                {displayedCustomerAddress}
+              </p>
+            )}
             {nota.customer_pic && (
               <div>
                 <span className="text-slate-500">up. </span>
@@ -530,9 +620,9 @@ export default function NotaDetail() {
             </thead>
             <tbody>
               {/* Item data terisi */}
-              {nota.items.map((it, i) => (
+              {displayedItems.map((it, i) => (
                 <tr
-                  key={it.id}
+                  key={it.id || i}
                   className="border-b hover:bg-slate-50/50"
                   style={theme.borderGrid}
                 >
@@ -552,7 +642,7 @@ export default function NotaDetail() {
                     className="py-1 px-2 text-center border-r"
                     style={theme.borderGrid}
                   >
-                    {isGeneratingPdf ? (
+                    {isGeneratingPdf || !it.id ? (
                       <span className="font-bold text-xs">{+it.qty}</span>
                     ) : (
                       <>
@@ -581,7 +671,7 @@ export default function NotaDetail() {
                     className="py-1 px-3 text-right border-r"
                     style={theme.borderGrid}
                   >
-                    {isGeneratingPdf ? (
+                    {isGeneratingPdf || !it.id ? (
                       <span className="font-semibold text-xs">
                         {rupiah(it.price).replace("Rp ", "")}
                       </span>
@@ -688,33 +778,43 @@ export default function NotaDetail() {
           </div>
         </div>
 
-        {/* Blok Tanda Tangan: Tanda Terima (Kiri) & Hormat Kami (Kanan) */}
-        <div className="signature-block flex justify-between items-end mt-4 pt-2 print:mt-2 print:pt-1 text-xs font-semibold">
+        {/* Blok Tanda Tangan: Tanda Terima (Kiri) & Hormat Kami (Kanan) - SEJAJAR 100% */}
+        <div className="signature-block grid grid-cols-2 gap-4 mt-6 pt-2 print:mt-4 print:pt-1 text-xs font-semibold">
           {/* Tanda Terima (Penerima) */}
-          <div className="text-center w-44">
-            <p className="text-slate-800 font-bold mb-10 print:mb-7">Tanda Terima,</p>
-            <div className="border-b border-dotted border-slate-700 mx-auto w-32" />
+          <div className="flex flex-col items-center justify-between text-center">
+            <p className="text-slate-800 font-bold">Tanda Terima,</p>
+            <div className="h-14 print:h-11 flex items-center justify-center my-0.5">
+              {/* Ruang kosong sejajar untuk tanda tangan fisik penerima */}
+            </div>
+            <div className="w-full flex flex-col items-center">
+              <div className="border-b border-dotted border-slate-700 w-36 sm:w-44" />
+              <p className="text-[11px] font-bold text-slate-900 mt-1 uppercase tracking-tight">
+                {displayedCustomerName}
+              </p>
+            </div>
           </div>
 
           {/* Hormat Kami (Toko / Supplier) */}
-          <div className="text-center w-48">
+          <div className="flex flex-col items-center justify-between text-center">
             <p className="text-slate-800 font-bold">Hormat Kami,</p>
-            <div className="h-12 print:h-10 flex items-center justify-center my-0.5">
+            <div className="h-14 print:h-11 flex items-center justify-center my-0.5">
               {nota.signature ? (
                 <img
                   src={sigDataUrl || fileUrl(nota.signature)}
                   crossOrigin="anonymous"
                   alt="ttd"
-                  className="max-h-12 print:max-h-9 max-w-32 object-contain"
+                  className="max-h-14 print:max-h-11 max-w-36 object-contain"
                 />
               ) : (
-                <div className="h-12 print:h-10" />
+                <div className="h-14 print:h-11" />
               )}
             </div>
-            <div className="border-b border-dotted border-slate-700 mx-auto w-36" />
-            <p className="text-[11px] font-bold text-slate-900 mt-0.5 uppercase">
-              {nota.supplier_name}
-            </p>
+            <div className="w-full flex flex-col items-center">
+              <div className="border-b border-dotted border-slate-700 w-36 sm:w-44" />
+              <p className="text-[11px] font-bold text-slate-900 mt-1 uppercase tracking-tight">
+                {nota.supplier_name}
+              </p>
+            </div>
           </div>
         </div>
       </div>

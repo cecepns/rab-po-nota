@@ -170,22 +170,22 @@ const R = {
   },
   pos: {
     table: 'pos',
-    readOnly: true,
     from: 'pos t LEFT JOIN suppliers s ON s.id=t.supplier_id',
     select:
-      't.*, s.name supplier_name, (SELECT COALESCE(SUM(total),0) FROM rab_items WHERE po_id=t.id) total, (SELECT id FROM notas WHERE po_id=t.id) nota_id',
-    search: ['t.po_no', 's.name'],
-    filters: ['date', 'supplier_id'],
+      't.*, s.name supplier_name, (SELECT COALESCE(SUM(total),0) FROM rab_items WHERE po_id=t.id) total, (SELECT id FROM notas WHERE po_id=t.id LIMIT 1) nota_id, (SELECT COUNT(*) FROM rab_items WHERE po_id=t.id) item_count',
+    search: ['t.po_no', 's.name', 't.payment_method', 't.notes', 't.status'],
+    filters: ['date', 'supplier_id', 'status'],
     sort: ['id', 'date', 'po_no'],
+    upd: ['status', 'payment_method', 'notes', 'date'],
   },
   notas: {
     table: 'notas',
     readOnly: true,
-    from: 'notas t LEFT JOIN suppliers s ON s.id=t.supplier_id LEFT JOIN pos p ON p.id=t.po_id',
+    from: 'notas t LEFT JOIN suppliers s ON s.id=t.supplier_id LEFT JOIN customers c ON c.id=t.customer_id LEFT JOIN pos p ON p.id=t.po_id',
     select:
-      't.*, s.name supplier_name, p.po_no, (SELECT COALESCE(SUM(total),0) FROM nota_items WHERE nota_id=t.id) total',
-    search: ['t.nota_no', 's.name', 'p.po_no'],
-    filters: ['date', 'supplier_id'],
+      't.*, s.name supplier_name, COALESCE(c.name, (SELECT GROUP_CONCAT(DISTINCT c2.name SEPARATOR ", ") FROM rab_items r JOIN customers c2 ON c2.id=r.customer_id WHERE r.po_id=p.id)) customer_name, p.po_no, (SELECT COALESCE(SUM(total),0) FROM nota_items WHERE nota_id=t.id) total',
+    search: ['t.nota_no', 's.name', 'p.po_no', 'c.name'],
+    filters: ['date', 'supplier_id', 'customer_id'],
     sort: ['id', 'date', 'nota_no'],
   },
 };
@@ -447,6 +447,124 @@ app.post(
 );
 
 // ---------- PO / Nota / Report ----------
+app.get(
+  '/api/pos/rab-preview',
+  auth,
+  wrap(async (req, res) => {
+    const { date } = req.query;
+    if (!date) throw fail(400, 'Parameter date wajib diisi');
+
+    const [items] = await db.query(
+      `SELECT r.*, s.name supplier_name, c.name customer_name
+       FROM rab_items r
+       LEFT JOIN suppliers s ON s.id=r.supplier_id
+       LEFT JOIN customers c ON c.id=r.customer_id
+       WHERE r.date=? AND r.po_id IS NULL
+       ORDER BY r.supplier_id, r.id`,
+      [date],
+    );
+    ok(res, items);
+  }),
+);
+
+app.post(
+  '/api/pos/batch-create',
+  auth,
+  wrap(async (req, res) => {
+    const { date, payment_method, notes, items } = req.body;
+    if (!date) throw fail(400, 'Tanggal wajib diisi');
+    if (!Array.isArray(items) || !items.length) {
+      throw fail(400, 'Pilih setidaknya 1 item dari RAB untuk dibuatkan PO');
+    }
+
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Kelompokkan item berdasarkan supplier_id
+      const bySupplier = {};
+      for (const it of items) {
+        const suppId = it.supplier_id;
+        if (!suppId) throw fail(400, `Item "${it.item_name}" belum memiliki supplier`);
+        if (!bySupplier[suppId]) bySupplier[suppId] = [];
+        bySupplier[suppId].push(it);
+      }
+
+      const createdPos = [];
+
+      for (const [suppId, suppItems] of Object.entries(bySupplier)) {
+        const [[{ n }]] = await conn.query(
+          'SELECT COUNT(*) n FROM pos WHERE date=? AND supplier_id=?',
+          [date, suppId],
+        );
+        const po_no = `PO/${date.replace(/-/g, '')}/${suppId}-${n + 1}`;
+        const [r] = await conn.query('INSERT INTO pos SET ?', [
+          {
+            po_no,
+            date,
+            supplier_id: suppId,
+            status: 'unpaid',
+            payment_method: payment_method || 'Transfer Bank (VA)',
+            notes: notes || null,
+          },
+        ]);
+
+        const poId = r.insertId;
+
+        // Update rab_items dengan po_id dan perbarui data jika ada penyesuaian
+        for (const it of suppItems) {
+          await conn.query(
+            'UPDATE rab_items SET po_id=?, supplier_id=?, qty=?, price=? WHERE id=?',
+            [poId, suppId, it.qty, it.price, it.id],
+          );
+        }
+
+        createdPos.push({ id: poId, po_no, supplier_id: suppId, count: suppItems.length });
+      }
+
+      await conn.commit();
+      ok(res, { success: true, count: createdPos.length, pos: createdPos });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  }),
+);
+
+app.post(
+  '/api/pos/:id/pay',
+  auth,
+  wrap(async (req, res) => {
+    const [[po]] = await db.query('SELECT id, status FROM pos WHERE id=?', [
+      req.params.id,
+    ]);
+    if (!po) throw fail(404, 'PO tidak ditemukan');
+
+    const nextStatus = po.status === 'paid' ? 'unpaid' : 'paid';
+    await db.query('UPDATE pos SET status=? WHERE id=?', [nextStatus, po.id]);
+    ok(res, { status: nextStatus, message: nextStatus === 'paid' ? 'Status diubah: Sudah Dibayar' : 'Status diubah: Belum Dibayar' });
+  }),
+);
+
+app.get(
+  '/api/pos/:id/items',
+  auth,
+  wrap(async (req, res) => {
+    const [items] = await db.query(
+      `SELECT r.*, c.name customer_name, s.name supplier_name
+       FROM rab_items r
+       LEFT JOIN customers c ON c.id=r.customer_id
+       LEFT JOIN suppliers s ON s.id=r.supplier_id
+       WHERE r.po_id=?
+       ORDER BY r.id`,
+      [req.params.id],
+    );
+    ok(res, items);
+  }),
+);
+
 app.post(
   '/api/pos/generate',
   auth,
@@ -499,20 +617,48 @@ app.post(
     ]);
     if (!po) throw fail(404, 'PO tidak ditemukan');
 
-    const [[dup]] = await db.query('SELECT id FROM notas WHERE po_id=?', [
+    const [existingNotas] = await db.query('SELECT id FROM notas WHERE po_id=?', [
       po.id,
     ]);
-    if (dup) throw fail(409, 'Nota untuk PO ini sudah ada');
+    if (existingNotas.length) throw fail(409, 'Nota untuk PO ini sudah ada');
 
-    const nota_no = po.po_no.replace('PO/', 'NT/');
-    const [r] = await db.query('INSERT INTO notas SET ?', [
-      { nota_no, date: po.date, supplier_id: po.supplier_id, po_id: po.id },
-    ]);
-    await db.query(
-      'INSERT INTO nota_items (nota_id,item_name,qty,unit,price) SELECT ?,item_name,SUM(qty),unit,price FROM rab_items WHERE po_id=? GROUP BY item_name,unit,price',
-      [r.insertId, po.id],
+    // Ambil daftar customer unik yang ada pada PO ini
+    const [customers] = await db.query(
+      'SELECT DISTINCT customer_id FROM rab_items WHERE po_id=? AND customer_id IS NOT NULL',
+      [po.id],
     );
-    ok(res, { id: r.insertId });
+
+    const baseNo = po.po_no.replace('PO/', 'NT/');
+    const createdIds = [];
+
+    if (customers.length <= 1) {
+      // 1 Customer atau tanpa customer: Buat 1 nota
+      const custId = customers.length ? customers[0].customer_id : null;
+      const [r] = await db.query('INSERT INTO notas SET ?', [
+        { nota_no: baseNo, date: po.date, supplier_id: po.supplier_id, po_id: po.id, customer_id: custId },
+      ]);
+      await db.query(
+        'INSERT INTO nota_items (nota_id,item_name,qty,unit,price) SELECT ?,item_name,SUM(qty),unit,price FROM rab_items WHERE po_id=? GROUP BY item_name,unit,price',
+        [r.insertId, po.id],
+      );
+      createdIds.push(r.insertId);
+    } else {
+      // Lebih dari 1 customer: Buat nota masing-masing per customer beserta item belanjaannya
+      for (let i = 0; i < customers.length; i++) {
+        const custId = customers[i].customer_id;
+        const notaNo = `${baseNo}-${i + 1}`;
+        const [r] = await db.query('INSERT INTO notas SET ?', [
+          { nota_no: notaNo, date: po.date, supplier_id: po.supplier_id, po_id: po.id, customer_id: custId },
+        ]);
+        await db.query(
+          'INSERT INTO nota_items (nota_id,item_name,qty,unit,price) SELECT ?,item_name,SUM(qty),unit,price FROM rab_items WHERE po_id=? AND customer_id=? GROUP BY item_name,unit,price',
+          [r.insertId, po.id, custId],
+        );
+        createdIds.push(r.insertId);
+      }
+    }
+
+    ok(res, { id: createdIds[0], ids: createdIds });
   }),
 );
 
@@ -521,11 +667,13 @@ app.get(
   auth,
   wrap(async (req, res) => {
     const [[nota]] = await db.query(
-      `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no,
-        (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id) customer_name
+      `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.notes supplier_notes, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no,
+        COALESCE(c_direct.name, (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id)) customer_name,
+        COALESCE(c_direct.address, (SELECT GROUP_CONCAT(DISTINCT c.address SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id)) customer_address
        FROM notas n
        JOIN suppliers s ON s.id=n.supplier_id
-       JOIN pos p ON p.id=n.po_id
+       LEFT JOIN customers c_direct ON c_direct.id=n.customer_id
+       LEFT JOIN pos p ON p.id=n.po_id
        WHERE n.id=?`,
       [req.params.id],
     );
@@ -535,7 +683,30 @@ app.get(
       'SELECT * FROM nota_items WHERE nota_id=? ORDER BY id',
       [nota.id],
     );
-    ok(res, { ...nota, items });
+
+    // Ambil daftar customer yang ada pada PO terkait
+    const [customers] = await db.query(
+      `SELECT DISTINCT c.id, c.name, c.address 
+       FROM rab_items r 
+       JOIN customers c ON c.id=r.customer_id 
+       WHERE r.po_id=?`,
+      [nota.po_id],
+    );
+
+    // Rincian item per customer dari rab_items jika nota lama belum terpisah
+    let customerItems = [];
+    if (customers.length > 1) {
+      const [rItems] = await db.query(
+        `SELECT r.customer_id, r.item_name, r.unit, r.price, SUM(r.qty) qty, SUM(r.total) total
+         FROM rab_items r
+         WHERE r.po_id=?
+         GROUP BY r.customer_id, r.item_name, r.unit, r.price`,
+        [nota.po_id],
+      );
+      customerItems = rItems;
+    }
+
+    ok(res, { ...nota, items, customers, customer_items: customerItems });
   }),
 );
 
@@ -745,6 +916,54 @@ app.use((e, req, res, next) => {
     }
   } catch (err) {
     console.error('Migration suppliers warning:', err.message);
+  }
+
+  // Pastikan kolom customer_id di notas tersedia & po_id bisa multi-nota per PO
+  try {
+    const [notaCols] = await db.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas'
+    `);
+    const existingNotaCols = (notaCols || []).map((c) => c.COLUMN_NAME);
+    if (!existingNotaCols.includes('customer_id')) {
+      await db.query(`ALTER TABLE notas ADD COLUMN customer_id INT NULL AFTER supplier_id`);
+    }
+
+    // Hapus indeks UNIQUE standalone pada po_id jika ada agar bisa buat nota terpisah per pelanggan
+    const [indexes] = await db.query(`
+      SELECT INDEX_NAME, NON_UNIQUE FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas' AND COLUMN_NAME = 'po_id' AND NON_UNIQUE = 0
+    `);
+    for (const idx of indexes) {
+      if (idx.INDEX_NAME && idx.INDEX_NAME !== 'PRIMARY') {
+        try {
+          await db.query(`ALTER TABLE notas DROP INDEX \`${idx.INDEX_NAME}\``);
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    console.error('Migration notas warning:', err.message);
+  }
+
+  // Pastikan kolom status, payment_method, notes di tabel pos tersedia
+  try {
+    const [posCols] = await db.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pos'
+    `);
+    const existingPosCols = (posCols || []).map((c) => c.COLUMN_NAME);
+
+    if (!existingPosCols.includes('status')) {
+      await db.query(`ALTER TABLE pos ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'unpaid' AFTER supplier_id`);
+    }
+    if (!existingPosCols.includes('payment_method')) {
+      await db.query(`ALTER TABLE pos ADD COLUMN payment_method VARCHAR(60) NULL AFTER status`);
+    }
+    if (!existingPosCols.includes('notes')) {
+      await db.query(`ALTER TABLE pos ADD COLUMN notes TEXT NULL AFTER payment_method`);
+    }
+  } catch (err) {
+    console.error('Migration pos warning:', err.message);
   }
 
   // Pastikan tabel materials tersedia

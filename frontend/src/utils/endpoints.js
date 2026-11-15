@@ -5,7 +5,15 @@ export const API_ENDPOINTS = {
   CUSTOMERS: { LIST: "/customers", DETAIL: (id) => `/customers/${id}` },
   MATERIALS: { LIST: "/materials", DETAIL: (id) => `/materials/${id}` },
   RAB: { LIST: "/rab", DETAIL: (id) => `/rab/${id}`, BATCH: "/rab/batch" },
-  PO: { LIST: "/pos", DETAIL: (id) => `/pos/${id}`, GENERATE: "/pos/generate" },
+  PO: {
+    LIST: "/pos",
+    DETAIL: (id) => `/pos/${id}`,
+    GENERATE: "/pos/generate",
+    RAB_PREVIEW: (date) => `/pos/rab-preview?date=${date}`,
+    BATCH_CREATE: "/pos/batch-create",
+    PAY: (id) => `/pos/${id}/pay`,
+    ITEMS: (id) => `/pos/${id}/items`,
+  },
   NOTA: {
     LIST: "/notas",
     DETAIL: (id) => `/notas/${id}`,
