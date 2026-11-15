@@ -750,10 +750,6 @@ export default function NotaDetail() {
       </div>
     );
 
-  // Jumlah baris minimal 5 agar pas 1 halaman A4 dan tidak tumpah ke page 2
-  const minRows = 5;
-  const emptyRowsCount = Math.max(0, minRows - (displayedItems.length || 0));
-
   return (
     <div className="mx-auto max-w-4xl space-y-4 print:max-w-none print:m-0 print:p-0">
       {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4, Background Putih Murni & Anti Blank Overlay */}
