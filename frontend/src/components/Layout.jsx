@@ -70,7 +70,7 @@ export default function Layout() {
   const currentItem = allItems.find(
     (i) => i.to === location.pathname || (i.to !== "/" && location.pathname.startsWith(i.to))
   );
-  const currentTitle = currentItem?.label || "Sistem RAB - PO - Nota";
+  const currentTitle = currentItem?.label || "Ikatandi Group";
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 print:bg-white print:text-black print:min-h-0 print:block">

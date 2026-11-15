@@ -27,7 +27,7 @@ export default function Logo({
     return (
       <img
         src="/logo-icon.png"
-        alt="Logo RAB PO Nota"
+        alt="Logo Ikatandi Group"
         className={`${h} w-auto object-contain select-none ${className}`}
       />
     );
@@ -39,13 +39,13 @@ export default function Logo({
       <div className={`flex items-center gap-3 select-none ${className}`}>
         <img
           src="/logo-icon.png"
-          alt="Logo RAB PO Nota"
+          alt="Logo Ikatandi Group"
           className={`${h} w-auto object-contain drop-shadow-md`}
         />
         {showText && (
           <div className="flex flex-col leading-tight">
             <span className={`font-black tracking-tight text-white ${t.title}`}>
-              RAB<span className="text-teal-400">·</span>PO<span className="text-teal-400">·</span>NOTA
+              IKATANDI<span className="text-teal-400"> GROUP</span>
             </span>
           </div>
         )}
@@ -53,14 +53,21 @@ export default function Logo({
     );
   }
 
-  // Tampilan default di latar terang (menggunakan gambar PNG logo lengkap transparan, tanpa kotak/background)
+  // Tampilan default di latar terang (menggunakan icon + teks Ikatandi Group)
   return (
-    <div className={`flex items-center select-none ${className}`}>
+    <div className={`flex items-center gap-3 select-none ${className}`}>
       <img
-        src="/logo.png"
-        alt="RAB PO Nota Logo"
+        src="/logo-icon.png"
+        alt="Logo Ikatandi Group"
         className={`${h} w-auto object-contain`}
       />
+      {showText && (
+        <div className="flex flex-col leading-tight">
+          <span className={`font-black tracking-tight text-slate-900 ${t.title}`}>
+            IKATANDI<span className="text-teal-600"> GROUP</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

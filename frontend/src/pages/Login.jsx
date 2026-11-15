@@ -63,11 +63,11 @@ export default function Login() {
         {/* Center Content */}
         <div className="relative z-10 max-w-lg space-y-6">
           <h1 className="text-3xl font-extrabold leading-tight text-white">
-            Sistem RAB, Purchase Order & Nota
+            Ikatandi Group
           </h1>
 
           <p className="text-sm text-teal-100/80 leading-relaxed">
-            Pengelolaan rencana anggaran biaya harian, penerbitan PO supplier, dan rekonsiliasi nota belanja.
+            Sistem pengelolaan rencana anggaran biaya harian, penerbitan PO supplier, dan rekonsiliasi nota belanja.
           </p>
 
           <div className="space-y-3 pt-2">
@@ -87,8 +87,8 @@ export default function Login() {
         </div>
 
         {/* Bottom */}
-        <div className="relative z-10 text-xs text-teal-300/60">
-          RAB · PO · Nota
+        <div className="relative z-10 text-xs text-teal-300/60 font-semibold tracking-wider uppercase">
+          Ikatandi Group
         </div>
       </div>
 
@@ -233,7 +233,7 @@ export default function Login() {
           </div> */}
 
           <p className="text-center text-xs text-slate-400">
-            &copy; {new Date().getFullYear()} RAB · PO · Nota
+            &copy; {new Date().getFullYear()} Ikatandi Group
           </p>
         </div>
       </div>

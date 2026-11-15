@@ -9,7 +9,9 @@ export default function Materials() {
       list={E.MATERIALS.LIST}
       detail={E.MATERIALS.DETAIL}
       columns={[
+        { key: "code", label: "Kode", render: (r) => r.code || "-" },
         { key: "name", label: "Nama Bahan" },
+        { key: "category", label: "Kategori", render: (r) => r.category || "-" },
         { key: "unit", label: "Satuan", render: (r) => r.unit || "-" },
         {
           key: "price",
@@ -23,8 +25,10 @@ export default function Materials() {
         },
       ]}
       fields={[
+        { name: "code", label: "Kode Bahan (misal: KH.01.001)" },
         { name: "name", label: "Nama Bahan Baku", required: true },
-        { name: "unit", label: "Satuan (kg, liter, dll)" },
+        { name: "category", label: "Kategori (misal: KARBOHIDRAT - BERAS DAN OLAHAN PADI)" },
+        { name: "unit", label: "Satuan (kg, liter, pak, dll)" },
         { name: "price", label: "Harga Standar / Terakhir", type: "number" },
         {
           name: "default_supplier_id",

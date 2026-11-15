@@ -153,11 +153,11 @@ const R = {
     table: 'materials',
     from: 'materials t LEFT JOIN suppliers s ON s.id=t.default_supplier_id',
     select: 't.*, s.name default_supplier_name',
-    cols: ['name', 'unit', 'price', 'default_supplier_id'],
+    cols: ['code', 'name', 'category', 'unit', 'price', 'default_supplier_id'],
     req: ['name'],
     num: ['price'],
-    search: ['t.name', 't.unit'],
-    sort: ['id', 'name', 'price'],
+    search: ['t.code', 't.name', 't.category', 't.unit'],
+    sort: ['id', 'code', 'name', 'price'],
   },
   rab: {
     table: 'rab_items',
@@ -989,7 +989,9 @@ app.use((e, req, res, next) => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS materials (
       id INT AUTO_INCREMENT PRIMARY KEY,
+      code VARCHAR(30) NULL,
       name VARCHAR(150) NOT NULL UNIQUE,
+      category VARCHAR(100) NULL,
       unit VARCHAR(30) NULL,
       price DECIMAL(14,2) NOT NULL DEFAULT 0,
       default_supplier_id INT NULL,
@@ -997,6 +999,17 @@ app.use((e, req, res, next) => {
       FOREIGN KEY (default_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
     )
   `);
+
+  try {
+    await db.query(`ALTER TABLE materials ADD COLUMN code VARCHAR(30) NULL AFTER id`);
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add code to materials:', e.message);
+  }
+  try {
+    await db.query(`ALTER TABLE materials ADD COLUMN category VARCHAR(100) NULL AFTER name`);
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add category to materials:', e.message);
+  }
 
   // Populasikan data awal materials dari rab_items yang sudah ada
   await db.query(`

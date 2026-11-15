@@ -149,7 +149,7 @@ export default function Rab() {
       const items = res.data?.data || [];
       const opts = items.map((m) => ({
         value: m.name,
-        label: m.name,
+        label: m.code ? `[${m.code}] ${m.name}` : m.name,
         data: m,
       }));
       setMaterialOptions(opts);
@@ -193,7 +193,7 @@ export default function Rab() {
           callback(
             items.map((m) => ({
               value: m.name,
-              label: m.name,
+              label: m.code ? `[${m.code}] ${m.name}` : m.name,
               data: m,
             }))
           );

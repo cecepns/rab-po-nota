@@ -11,8 +11,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "Sistem RAB - PO - Nota",
-        short_name: "RAB PO Nota",
+        name: "Ikatandi Group",
+        short_name: "Ikatandi Group",
         theme_color: "#0f766e",
         background_color: "#f0f7f6",
         display: "standalone",
