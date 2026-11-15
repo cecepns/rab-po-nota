@@ -305,7 +305,7 @@ export default function Rab() {
     });
     setBatchItems([
       {
-        customer_id: currCust[0]?.id || "",
+        customer_id: "",
         item_name: "",
         supplier_id: currSupp[0]?.id || "",
         qty: 1,
@@ -322,7 +322,7 @@ export default function Rab() {
     setBatchItems((prev) => [
       ...prev,
       {
-        customer_id: lastRow?.customer_id || customers[0]?.id || "",
+        customer_id: lastRow?.customer_id || "",
         item_name: "",
         supplier_id: lastRow?.supplier_id || suppliers[0]?.id || "",
         qty: 1,
@@ -1134,6 +1134,7 @@ export default function Rab() {
                               }
                             }}
                             placeholder="Pilih Pelanggan..."
+                            isClearable
                             menuPosition="fixed"
                             menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                             styles={creatableSelectStyles}
@@ -1196,6 +1197,7 @@ export default function Rab() {
                               }
                             }}
                             placeholder="Pilih Supplier..."
+                            isClearable
                             menuPosition="fixed"
                             menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                             styles={creatableSelectStyles}
@@ -1322,6 +1324,7 @@ export default function Rab() {
                                   }
                                 }}
                                 placeholder="Pilih Pelanggan..."
+                            isClearable
                                 menuPosition="fixed"
                                 menuPortalTarget={
                                   typeof document !== "undefined"
@@ -1396,6 +1399,7 @@ export default function Rab() {
                                   }
                                 }}
                                 placeholder="Pilih Supplier..."
+                            isClearable
                                 menuPosition="fixed"
                                 menuPortalTarget={
                                   typeof document !== "undefined"

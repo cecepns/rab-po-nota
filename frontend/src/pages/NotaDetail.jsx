@@ -168,6 +168,7 @@ function SingleNotaSheet({
   theme,
   logoDataUrl,
   sigDataUrl,
+  stampDataUrl,
   isGeneratingPdf,
   editItem,
   saveItem,
@@ -186,53 +187,53 @@ function SingleNotaSheet({
       } print:rounded-none print:border-0 print:shadow-none print:p-0 print:m-0 print:bg-white`}
       style={{ backgroundColor: "#ffffff" }}
     >
-      {/* Header Nota: Kiri (Kop Toko & Catatan Toko) & Kanan (Hari, Tanggal, Kepada Yth & Alamat Pelanggan) */}
+      {/* Header Nota: Kiri (Kop Toko Besar & Catatan Toko) & Kanan (Hari, Tanggal, Kepada Yth & Alamat Pelanggan Rapi) */}
       <div
-        className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b-2"
+        className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3.5 border-b-2"
         style={theme.borderSolid}
       >
-        {/* Sisi Kiri: Logo, Nama Toko, Catatan Toko & Alamat */}
-        <div className="flex items-start gap-3.5 flex-1 min-w-0">
+        {/* Sisi Kiri: Logo Toko Besar, Nama Toko Menonjol, Catatan/Slogan & Alamat */}
+        <div className="flex items-start gap-4 flex-1 min-w-0">
           {nota.logo ? (
             <img
               src={logoDataUrl || fileUrl(nota.logo)}
               crossOrigin="anonymous"
               alt=""
-              className="h-14 w-14 object-contain rounded-lg border border-slate-200 p-1 shrink-0"
+              className="h-20 w-20 sm:h-24 sm:w-24 print:h-[78px] print:w-[78px] object-contain rounded-xl border border-slate-200/80 p-1.5 shrink-0 bg-white shadow-2xs print:shadow-none"
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-800 shrink-0">
-              <Building2 size={26} />
+            <div className="flex h-20 w-20 sm:h-24 sm:w-24 print:h-[78px] print:w-[78px] items-center justify-center rounded-xl bg-slate-100 text-slate-700 shrink-0">
+              <Building2 size={36} />
             </div>
           )}
-          <div className="space-y-0.5 min-w-0">
+          <div className="space-y-1 min-w-0">
             <h2
-              className="text-xl sm:text-2xl font-black uppercase tracking-tight"
+              className="text-2xl sm:text-3xl print:text-[24px] font-black uppercase tracking-tight leading-none"
               style={theme.text}
             >
               {nota.supplier_name}
             </h2>
-            {/* Catatan / Slogan Toko di Bawah Nama Toko (sesuai foto bukti fisik) */}
-            {nota.supplier_notes && (
-              <p className="text-xs font-semibold text-slate-700 italic leading-snug">
-                {nota.supplier_notes}
+            {/* Catatan / Slogan Toko di Bawah Nama Toko (sesuai foto bukti fisik, misal: MENJUAL SEMBAKO & SAYURAN / Sedia berbagai jenis Daging...) */}
+            {(nota.supplier_notes || nota.notes) && (
+              <p className="text-xs sm:text-[13px] print:text-xs font-bold text-slate-800 uppercase tracking-wide leading-snug pt-0.5">
+                {nota.supplier_notes || nota.notes}
               </p>
             )}
             {nota.supplier_address && (
-              <p className="text-xs text-slate-600 leading-snug">
+              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-600 leading-snug pt-0.5">
                 {nota.supplier_address}
               </p>
             )}
             {nota.supplier_phone && (
-              <p className="text-xs text-slate-500">
-                Telp / WA: <b>{nota.supplier_phone}</b>
+              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-700 font-medium">
+                Telp / WA: <b className="font-bold">{nota.supplier_phone}</b>
               </p>
             )}
           </div>
         </div>
 
-        {/* Sisi Kanan: Hari, Tanggal, Kepada Yth & Alamat Pelanggan */}
-        <div className="w-full sm:w-auto text-xs space-y-0.5 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+        {/* Sisi Kanan: Hari, Tanggal, Kepada Yth & Alamat Pelanggan (dibatasi agar membungkus ke bawah rapi) */}
+        <div className="w-full sm:w-auto max-w-[280px] sm:max-w-[340px] print:max-w-[290px] text-right ml-auto space-y-1 text-xs print:text-[11px] border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
           <div>
             <span className="text-slate-500">Hari, Tanggal: </span>
             <b className="text-slate-900 font-bold">
@@ -241,22 +242,19 @@ function SingleNotaSheet({
           </div>
           <div>
             <span className="text-slate-500">Kepada Yth. </span>
-            <b className="text-slate-900 font-bold">
+            <b className="text-slate-900 font-bold block sm:inline">
               {customer?.name || nota.customer_name || "Pelanggan / SPPG"}
             </b>
           </div>
-          {/* Alamat Pelanggan dimunculkan */}
+          {/* Alamat Pelanggan ke bawah rapi tidak memanjang ke samping */}
           {(customer?.address || nota.customer_address) && (
-            <p className="text-[11px] text-slate-600 font-normal leading-tight">
+            <p className="text-[11px] print:text-[10.5px] text-slate-600 font-normal leading-snug break-words mt-0.5">
               {customer?.address || nota.customer_address}
             </p>
           )}
           {nota.customer_pic && (
-            <div>
-              <span className="text-slate-500">up. </span>
-              <span className="font-semibold text-slate-800">
-                {nota.customer_pic}
-              </span>
+            <div className="text-[11px] text-slate-500">
+              up. <span className="font-semibold text-slate-800">{nota.customer_pic}</span>
             </div>
           )}
         </div>
@@ -470,41 +468,66 @@ function SingleNotaSheet({
         </div>
       </div>
 
-      {/* Blok Tanda Tangan: Tanda Terima (Kiri) & Hormat Kami (Kanan) - SEJAJAR 100% */}
-      <div className="signature-block grid grid-cols-2 gap-4 mt-6 pt-2 print:mt-4 print:pt-1 text-xs font-semibold">
+      {/* Blok Tanda Tangan: Tanda Terima (Kiri) & Hormat Kami (Kanan) - SEJAJAR 100% PERSIS DENGAN JARAK ~4 CM UNTUK STEMPEL & TTD */}
+      <div className="signature-block grid grid-cols-2 gap-8 mt-6 pt-2 print:mt-4 print:pt-0 text-xs font-semibold">
         {/* Tanda Terima (Penerima) */}
-        <div className="flex flex-col items-center justify-between text-center">
-          <p className="text-slate-800 font-bold">Tanda Terima,</p>
-          <div className="h-14 print:h-11 flex items-center justify-center my-0.5">
-            {/* Ruang kosong sejajar untuk tanda tangan fisik penerima */}
+        <div className="flex flex-col items-center text-center">
+          <div className="h-6 flex items-center justify-center">
+            <p className="text-slate-800 font-bold text-sm print:text-xs">Tanda Terima,</p>
           </div>
+
+          {/* Area Kosong Jarak 4 cm (~140px) untuk TTD & Stempel Fisik Penerima */}
+          <div className="h-[140px] print:h-[135px] w-full flex items-center justify-center relative my-1">
+            {/* Tempat tanda tangan & stempel fisik penerima */}
+          </div>
+
           <div className="w-full flex flex-col items-center">
-            <div className="border-b border-dotted border-slate-700 w-36 sm:w-44" />
-            <p className="text-[11px] font-bold text-slate-900 mt-1 uppercase tracking-tight">
-              {customer?.name || nota.customer_name || "Pelanggan / SPPG"}
+            <div className="border-b-2 border-dotted border-slate-700 w-44 sm:w-56" />
+            <p className="text-xs sm:text-[13px] print:text-[11.5px] font-bold text-slate-900 mt-1.5 uppercase tracking-tight">
+              ( {customer?.name || nota.customer_name || "Pelanggan / SPPG"} )
             </p>
           </div>
         </div>
 
         {/* Hormat Kami (Toko / Supplier) */}
-        <div className="flex flex-col items-center justify-between text-center">
-          <p className="text-slate-800 font-bold">Hormat Kami,</p>
-          <div className="h-14 print:h-11 flex items-center justify-center my-0.5">
+        <div className="flex flex-col items-center text-center">
+          <div className="h-6 flex items-center justify-center">
+            <p className="text-slate-800 font-bold text-sm print:text-xs">Hormat Kami,</p>
+          </div>
+
+          {/* Area TTD & Stempel Toko Jarak 4 cm (~140px) */}
+          <div className="h-[140px] print:h-[135px] w-full flex items-center justify-center relative my-1">
+            {/* Stempel Toko: Ukuran lebih besar dari TTD (~130px), realistis dengan sedikit rotasi */}
+            {nota.stamp && (
+              <img
+                src={stampDataUrl || fileUrl(nota.stamp)}
+                crossOrigin="anonymous"
+                alt="stempel"
+                className="absolute max-h-[130px] max-w-[130px] print:max-h-[125px] print:max-w-[125px] object-contain opacity-90 pointer-events-none -rotate-6 z-10"
+                style={{
+                  left: nota.signature ? "30%" : "50%",
+                  transform: "translateX(-50%) rotate(-6deg)",
+                }}
+              />
+            )}
+
+            {/* Tanda Tangan Toko: Besar dan jelas */}
             {nota.signature ? (
               <img
                 src={sigDataUrl || fileUrl(nota.signature)}
                 crossOrigin="anonymous"
                 alt="ttd"
-                className="max-h-14 print:max-h-11 max-w-36 object-contain"
+                className="max-h-[110px] max-w-[175px] print:max-h-[105px] print:max-w-[165px] object-contain relative z-20"
               />
             ) : (
-              <div className="h-14 print:h-11" />
+              !nota.stamp && <div className="h-full w-full" />
             )}
           </div>
+
           <div className="w-full flex flex-col items-center">
-            <div className="border-b border-dotted border-slate-700 w-36 sm:w-44" />
-            <p className="text-[11px] font-bold text-slate-900 mt-1 uppercase tracking-tight">
-              {nota.supplier_name}
+            <div className="border-b-2 border-dotted border-slate-700 w-44 sm:w-56" />
+            <p className="text-xs sm:text-[13px] print:text-[11.5px] font-bold text-slate-900 mt-1.5 uppercase tracking-tight">
+              ( {nota.supplier_name} )
             </p>
           </div>
         </div>
@@ -521,6 +544,7 @@ export default function NotaDetail() {
   const [currentColor, setCurrentColor] = useState("#1e293b");
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [sigDataUrl, setSigDataUrl] = useState(null);
+  const [stampDataUrl, setStampDataUrl] = useState(null);
   // selectedCustomerId === null berarti mode "Semua Nota" (menampilkan semua lembar nota per pelanggan)
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
@@ -534,6 +558,9 @@ export default function NotaDetail() {
       }
       if (res.data.signature) {
         toDataUrl(fileUrl(res.data.signature)).then((d) => setSigDataUrl(d));
+      }
+      if (res.data.stamp) {
+        toDataUrl(fileUrl(res.data.stamp)).then((d) => setStampDataUrl(d));
       }
     }
   };
@@ -1012,6 +1039,7 @@ export default function NotaDetail() {
                 theme={theme}
                 logoDataUrl={logoDataUrl}
                 sigDataUrl={sigDataUrl}
+                stampDataUrl={stampDataUrl}
                 isGeneratingPdf={isGeneratingPdf}
                 editItem={editItem}
                 saveItem={saveItem}

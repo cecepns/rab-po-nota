@@ -86,6 +86,11 @@ export default function Suppliers() {
           label: "TTD",
           render: (r) => img(r.signature),
         },
+        {
+          key: "stamp",
+          label: "Stempel",
+          render: (r) => img(r.stamp),
+        },
       ]}
       fields={[
         { name: "name", label: "Nama Supplier", required: true },
@@ -120,6 +125,12 @@ export default function Suppliers() {
         {
           name: "signature",
           label: "Tanda Tangan (untuk nota)",
+          type: "file",
+          half: true,
+        },
+        {
+          name: "stamp",
+          label: "Stempel Toko (untuk nota)",
           type: "file",
           half: true,
         },

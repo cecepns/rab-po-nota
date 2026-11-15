@@ -118,7 +118,7 @@ const R = {
       'address',
       'notes',
     ],
-    files: ['logo', 'signature'],
+    files: ['logo', 'signature', 'stamp'],
     req: ['name'],
     search: [
       't.name',
@@ -667,7 +667,7 @@ app.get(
   auth,
   wrap(async (req, res) => {
     const [[nota]] = await db.query(
-      `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.notes supplier_notes, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, p.po_no,
+      `SELECT n.*, s.name supplier_name, s.address supplier_address, s.phone supplier_phone, s.notes supplier_notes, s.pic_name, s.bank_name, s.bank_account_no, s.bank_account_name, s.logo, s.signature, s.stamp, p.po_no,
         COALESCE(c_direct.name, (SELECT GROUP_CONCAT(DISTINCT c.name SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id)) customer_name,
         COALESCE(c_direct.address, (SELECT GROUP_CONCAT(DISTINCT c.address SEPARATOR ', ') FROM rab_items r JOIN customers c ON c.id=r.customer_id WHERE r.po_id=p.id)) customer_address
        FROM notas n
@@ -907,6 +907,7 @@ app.use((e, req, res, next) => {
       { name: 'bank_account_no', sql: 'ALTER TABLE suppliers ADD COLUMN bank_account_no VARCHAR(60) NULL AFTER bank_name' },
       { name: 'bank_account_name', sql: 'ALTER TABLE suppliers ADD COLUMN bank_account_name VARCHAR(120) NULL AFTER bank_account_no' },
       { name: 'notes', sql: 'ALTER TABLE suppliers ADD COLUMN notes TEXT NULL AFTER address' },
+      { name: 'stamp', sql: 'ALTER TABLE suppliers ADD COLUMN stamp VARCHAR(120) NULL AFTER signature' },
     ];
 
     for (const col of supplierColsToAdd) {
