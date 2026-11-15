@@ -189,7 +189,7 @@ function SingleNotaSheet({
     >
       {/* Header Nota: Kiri (Kop Toko Besar & Catatan Toko) & Kanan (Hari, Tanggal, Kepada Yth & Alamat Pelanggan Rapi) */}
       <div
-        className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3.5 border-b-2"
+        className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-1 print:pt-2 pb-3.5 border-b-2"
         style={theme.borderSolid}
       >
         {/* Sisi Kiri: Logo Toko Besar, Nama Toko Menonjol, Catatan/Slogan & Alamat */}
@@ -215,18 +215,18 @@ function SingleNotaSheet({
             </h2>
             {/* Catatan / Slogan Toko di Bawah Nama Toko (sesuai foto bukti fisik, misal: MENJUAL SEMBAKO & SAYURAN / Sedia berbagai jenis Daging...) */}
             {(nota.supplier_notes || nota.notes) && (
-              <p className="text-xs sm:text-[13px] print:text-xs font-bold text-slate-800 uppercase tracking-wide leading-snug pt-0.5">
+              <p className="text-xs sm:text-[13px] print:text-xs font-bold text-slate-800 print:text-black uppercase tracking-wide leading-snug pt-0.5">
                 {nota.supplier_notes || nota.notes}
               </p>
             )}
             {nota.supplier_address && (
-              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-600 leading-snug pt-0.5">
+              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-600 print:text-black leading-snug pt-0.5">
                 {nota.supplier_address}
               </p>
             )}
             {nota.supplier_phone && (
-              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-700 font-medium">
-                Telp / WA: <b className="font-bold">{nota.supplier_phone}</b>
+              <p className="text-xs sm:text-[13px] print:text-[11px] text-slate-700 print:text-black font-medium">
+                Telp / WA: <b className="font-bold print:text-black">{nota.supplier_phone}</b>
               </p>
             )}
           </div>
@@ -235,26 +235,26 @@ function SingleNotaSheet({
         {/* Sisi Kanan: Hari, Tanggal, Kepada Yth & Alamat Pelanggan (dibatasi agar membungkus ke bawah rapi) */}
         <div className="w-full sm:w-auto max-w-[280px] sm:max-w-[340px] print:max-w-[290px] text-right ml-auto space-y-1 text-xs print:text-[11px] border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
           <div>
-            <span className="text-slate-500">Hari, Tanggal: </span>
-            <b className="text-slate-900 font-bold">
+            <span className="text-slate-500 print:text-black">Hari, Tanggal: </span>
+            <b className="text-slate-900 print:text-black font-bold">
               {formatHariTanggal(nota.date)}
             </b>
           </div>
           <div>
-            <span className="text-slate-500">Kepada Yth. </span>
-            <b className="text-slate-900 font-bold block sm:inline">
+            <span className="text-slate-500 print:text-black">Kepada Yth. </span>
+            <b className="text-slate-900 print:text-black font-bold block sm:inline">
               {customer?.name || nota.customer_name || "Pelanggan / SPPG"}
             </b>
           </div>
           {/* Alamat Pelanggan ke bawah rapi tidak memanjang ke samping */}
           {(customer?.address || nota.customer_address) && (
-            <p className="text-[11px] print:text-[10.5px] text-slate-600 font-normal leading-snug break-words mt-0.5">
+            <p className="text-[11px] print:text-[10.5px] text-slate-600 print:text-black font-normal leading-snug break-words mt-0.5">
               {customer?.address || nota.customer_address}
             </p>
           )}
           {nota.customer_pic && (
-            <div className="text-[11px] text-slate-500">
-              up. <span className="font-semibold text-slate-800">{nota.customer_pic}</span>
+            <div className="text-[11px] text-slate-500 print:text-black">
+              up. <span className="font-semibold text-slate-800 print:text-black">{nota.customer_pic}</span>
             </div>
           )}
         </div>
@@ -262,20 +262,20 @@ function SingleNotaSheet({
 
       {/* Baris Nomor Nota & Ref PO */}
       <div
-        className="flex items-center justify-between text-xs py-2 border-b font-semibold text-slate-700"
+        className="flex items-center justify-between text-xs py-2 border-b font-semibold text-slate-700 print:text-black"
         style={theme.borderGrid}
       >
         <div>
-          Nota No. : <b style={theme.text}>{notaNo || nota.nota_no}</b>
+          Nota No. : <b style={theme.text} className="print:text-black">{notaNo || nota.nota_no}</b>
           {totalSheets > 1 && (
-            <span className="text-slate-500 font-normal ml-2">
+            <span className="text-slate-500 font-normal ml-2 print:hidden">
               (Lembar {sheetIndex + 1} dari {totalSheets})
             </span>
           )}
         </div>
         {nota.po_no && (
-          <div className="text-slate-500">
-            Ref PO: <span className="font-medium text-slate-700">{nota.po_no}</span>
+          <div className="text-slate-500 print:text-black">
+            Ref PO: <span className="font-medium text-slate-700 print:text-black">{nota.po_no}</span>
           </div>
         )}
       </div>
@@ -317,13 +317,13 @@ function SingleNotaSheet({
                 style={theme.borderGrid}
               >
                 <td
-                  className="py-1.5 px-2 text-center text-slate-500 border-r font-medium"
+                  className="py-1.5 px-2 text-center text-slate-500 print:text-black border-r font-medium"
                   style={theme.borderGrid}
                 >
                   {i + 1}
                 </td>
                 <td
-                  className="py-1.5 px-3 font-bold text-slate-900 border-r"
+                  className="py-1.5 px-3 font-bold text-slate-900 print:text-black border-r"
                   style={theme.borderGrid}
                 >
                   {it.item_name}
@@ -333,7 +333,7 @@ function SingleNotaSheet({
                   style={theme.borderGrid}
                 >
                   {isGeneratingPdf || !it.id ? (
-                    <span className="font-bold text-xs">{+it.qty}</span>
+                    <span className="font-bold text-xs print:text-black">{+it.qty}</span>
                   ) : (
                     <>
                       <input
@@ -345,14 +345,14 @@ function SingleNotaSheet({
                         onChange={(e) => editItem(it, "qty", e.target.value)}
                         onBlur={() => saveItem(it)}
                       />
-                      <span className="hidden print:inline font-bold">
+                      <span className="hidden print:inline font-bold print:text-black">
                         {+it.qty}
                       </span>
                     </>
                   )}
                 </td>
                 <td
-                  className="py-1.5 px-2 text-center text-slate-600 border-r"
+                  className="py-1.5 px-2 text-center text-slate-600 print:text-black border-r"
                   style={theme.borderGrid}
                 >
                   {it.unit || "-"}
@@ -362,7 +362,7 @@ function SingleNotaSheet({
                   style={theme.borderGrid}
                 >
                   {isGeneratingPdf || !it.id ? (
-                    <span className="font-semibold text-xs">
+                    <span className="font-semibold text-xs print:text-black">
                       {rupiah(it.price).replace("Rp ", "")}
                     </span>
                   ) : (
@@ -376,13 +376,13 @@ function SingleNotaSheet({
                         onChange={(e) => editItem(it, "price", e.target.value)}
                         onBlur={() => saveItem(it)}
                       />
-                      <span className="hidden print:inline font-semibold">
+                      <span className="hidden print:inline font-semibold print:text-black">
                         {rupiah(it.price).replace("Rp ", "")}
                       </span>
                     </>
                   )}
                 </td>
-                <td className="py-1.5 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                <td className="py-1.5 px-3 text-right font-black text-slate-900 print:text-black whitespace-nowrap">
                   {rupiah(it.total).replace("Rp ", "")}
                 </td>
               </tr>
@@ -497,16 +497,16 @@ function SingleNotaSheet({
 
           {/* Area TTD & Stempel Toko Jarak 4 cm (~140px) */}
           <div className="h-[140px] print:h-[135px] w-full flex items-center justify-center relative my-1">
-            {/* Stempel Toko: Ukuran lebih besar dari TTD (~130px), realistis dengan sedikit rotasi */}
+            {/* Stempel Toko: Ukuran lebih besar dari TTD (~130px), tegak lurus */}
             {nota.stamp && (
               <img
                 src={stampDataUrl || fileUrl(nota.stamp)}
                 crossOrigin="anonymous"
                 alt="stempel"
-                className="absolute max-h-[130px] max-w-[130px] print:max-h-[125px] print:max-w-[125px] object-contain opacity-90 pointer-events-none -rotate-6 z-10"
+                className="absolute max-h-[130px] max-w-[130px] print:max-h-[125px] print:max-w-[125px] object-contain opacity-90 pointer-events-none z-10"
                 style={{
                   left: nota.signature ? "40%" : "50%",
-                  transform: "translateX(-50%) rotate(-6deg)",
+                  transform: "translateX(-50%)",
                 }}
               />
             )}
@@ -725,8 +725,10 @@ export default function NotaDetail() {
 
       const pageWidth = 210;
       const pageHeight = 297;
-      const margin = 8;
-      const printWidth = pageWidth - margin * 2; // 194mm
+      const marginX = 12;
+      const marginTop = 18;
+      const marginBottom = 14;
+      const printWidth = pageWidth - marginX * 2; // 186mm
 
       for (let i = 0; i < sheetElements.length; i++) {
         if (i > 0) {
@@ -750,9 +752,9 @@ export default function NotaDetail() {
 
         const imgData = canvas.toDataURL("image/jpeg", 0.98);
         const imgHeight = (canvas.height * printWidth) / canvas.width;
-        const renderHeight = Math.min(imgHeight, pageHeight - margin * 2);
+        const renderHeight = Math.min(imgHeight, pageHeight - marginTop - marginBottom);
 
-        pdf.addImage(imgData, "JPEG", margin, margin, printWidth, renderHeight);
+        pdf.addImage(imgData, "JPEG", marginX, marginTop, printWidth, renderHeight);
       }
 
       pdf.save(`Nota_${cleanNo}_${cleanTarget}.pdf`);
@@ -783,7 +785,7 @@ export default function NotaDetail() {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 8mm 10mm 8mm 10mm;
+          margin: 18mm 12mm 14mm 12mm;
         }
         @media print {
           html, body {
@@ -839,6 +841,7 @@ export default function NotaDetail() {
             border: none !important;
             border-radius: 0 !important;
             padding: 0 !important;
+            padding-top: 5mm !important;
             margin: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
