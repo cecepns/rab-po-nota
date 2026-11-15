@@ -34,7 +34,21 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     color: black !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
+  
+  /* Hilangkan flexbox pada container layout utama saat print agar page-break antar lembar nota berfungsi 100% */
+  #root, #root > div, main {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
   /* Sembunyikan elemen toast, fixed portal, backdrop, dan UI navigasi saat print */
   [data-hot-toast], .toaster, [role="status"], aside, nav, header {
     display: none !important;

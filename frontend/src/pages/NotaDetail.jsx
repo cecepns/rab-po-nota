@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, Fragment } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Printer,
@@ -752,11 +752,11 @@ export default function NotaDetail() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 print:max-w-none print:m-0 print:p-0">
-      {/* CSS Khusus Cetak Browser: Menjamin 1 Halaman A4, Background Putih Murni & Anti Blank Overlay */}
+      {/* CSS Khusus Cetak Browser: Menjamin Setiap Nota Berada di Halaman A4 Tersendiri (Anti-Nempel & 1 Halaman per Nota) */}
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 7mm 9mm 7mm 9mm;
+          margin: 8mm 10mm 8mm 10mm;
         }
         @media print {
           html, body {
@@ -764,16 +764,35 @@ export default function NotaDetail() {
             background-color: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
           }
           *, *::before, *::after {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          /* Sembunyikan elemen fixed, toast, backdrop, modal, dan navbar saat print */
-          [data-hot-toast], .toaster, [role="status"], aside, nav, header {
+          /* Sembunyikan elemen UI yang tidak perlu saat cetak */
+          [data-hot-toast], .toaster, [role="status"], aside, nav, header, .print-hidden {
             display: none !important;
           }
+
+          /* Container pembungkus setiap lembar nota dipaksa pindah ke halaman baru */
+          .nota-paper-wrapper {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .nota-paper-wrapper:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
           .nota-paper {
             background: #ffffff !important;
             background-color: #ffffff !important;
@@ -784,20 +803,26 @@ export default function NotaDetail() {
             margin: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
-            page-break-after: always !important;
-            break-after: page !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
-          .nota-paper-wrapper:last-child .nota-paper,
-          .nota-paper:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
-          }
+
           .signature-block {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
             page-break-after: avoid !important;
+          }
+
+          /* Elemen pemisah halaman eksplisit untuk browser print engine */
+          .page-break-divider {
+            display: block !important;
+            page-break-before: always !important;
+            break-before: page !important;
+            clear: both !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            visibility: hidden !important;
           }
         }
       `}</style>
@@ -928,46 +953,60 @@ export default function NotaDetail() {
       )}
 
       {/* Lembar-lembar Nota Kontan / Faktur Fisik */}
-      <div ref={containerRef} className="space-y-6 print:space-y-0">
+      <div ref={containerRef} className="space-y-8 print:space-y-0">
         {sheetsToRender.map((sheet, sIdx) => (
-          <div
-            key={sheet.customer?.id || sIdx}
-            className="nota-paper-wrapper space-y-2"
-          >
-            {/* Banner pembatas antar lembar di layar monitor jika mode 'Semua Nota' */}
-            {hasMultipleCustomers && selectedCustomerId === null && (
-              <div className="flex items-center justify-between bg-amber-100/80 border border-amber-300/80 px-4 py-2 rounded-xl text-xs font-bold text-amber-900 print:hidden shadow-2xs">
-                <span className="flex items-center gap-1.5">
-                  <FileText size={15} className="text-amber-700" />
-                  <span>
-                    Lembar Nota #{sIdx + 1} : Kepada Yth. {sheet.customer?.name}
-                  </span>
-                </span>
-                <span className="text-[11px] text-amber-900 font-semibold bg-white/80 px-2 py-0.5 rounded border border-amber-200">
-                  {sheet.items.length} item barang • Subtotal{" "}
-                  {rupiah(
-                    sheet.items.reduce((s, it) => s + +it.total, 0)
-                  )}
-                </span>
-              </div>
+          <Fragment key={sheet.customer?.id || sIdx}>
+            {/* Pemisah halaman eksplisit untuk cetak browser jika lebih dari 1 lembar */}
+            {sIdx > 0 && (
+              <div
+                className="page-break-divider hidden print:block"
+                style={{
+                  pageBreakBefore: "always",
+                  breakBefore: "page",
+                  clear: "both",
+                  height: 0,
+                  margin: 0,
+                  padding: 0,
+                }}
+              />
             )}
 
-            <SingleNotaSheet
-              nota={nota}
-              customer={sheet.customer}
-              items={sheet.items}
-              notaNo={sheet.notaNo}
-              sheetIndex={sheet.sheetIndex}
-              totalSheets={sheet.totalSheets}
-              theme={theme}
-              logoDataUrl={logoDataUrl}
-              sigDataUrl={sigDataUrl}
-              isGeneratingPdf={isGeneratingPdf}
-              editItem={editItem}
-              saveItem={saveItem}
-              formatHariTanggal={formatHariTanggal}
-            />
-          </div>
+            <div className="nota-paper-wrapper space-y-2">
+              {/* Banner pembatas antar lembar di layar monitor jika mode 'Semua Nota' */}
+              {hasMultipleCustomers && selectedCustomerId === null && (
+                <div className="flex items-center justify-between bg-amber-100/80 border border-amber-300/80 px-4 py-2.5 rounded-xl text-xs font-bold text-amber-900 print:hidden shadow-2xs">
+                  <span className="flex items-center gap-1.5">
+                    <FileText size={15} className="text-amber-700" />
+                    <span>
+                      Lembar Nota #{sIdx + 1} dari {sheetsToRender.length} : Kepada Yth. {sheet.customer?.name}
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-amber-900 font-semibold bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+                    {sheet.items.length} item barang • Subtotal{" "}
+                    {rupiah(
+                      sheet.items.reduce((s, it) => s + +it.total, 0)
+                    )}
+                  </span>
+                </div>
+              )}
+
+              <SingleNotaSheet
+                nota={nota}
+                customer={sheet.customer}
+                items={sheet.items}
+                notaNo={sheet.notaNo}
+                sheetIndex={sheet.sheetIndex}
+                totalSheets={sheet.totalSheets}
+                theme={theme}
+                logoDataUrl={logoDataUrl}
+                sigDataUrl={sigDataUrl}
+                isGeneratingPdf={isGeneratingPdf}
+                editItem={editItem}
+                saveItem={saveItem}
+                formatHariTanggal={formatHariTanggal}
+              />
+            </div>
+          </Fragment>
         ))}
       </div>
     </div>
