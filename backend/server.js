@@ -96,10 +96,20 @@ const auth = (req, res, next) => {
 const ok = (res, data, pagination) =>
   res.json({ success: true, data, ...(pagination && { pagination }) });
 
-const fileFields = upload.fields([
-  { name: 'logo', maxCount: 1 },
-  { name: 'signature', maxCount: 1 },
-]);
+const fileFields = (req, res, next) => {
+  upload.any()(req, res, (err) => {
+    if (err) return next(err);
+    if (Array.isArray(req.files)) {
+      const filesObj = {};
+      for (const file of req.files) {
+        if (!filesObj[file.fieldname]) filesObj[file.fieldname] = [];
+        filesObj[file.fieldname].push(file);
+      }
+      req.files = filesObj;
+    }
+    next();
+  });
+};
 
 // ---------- resource config (generic CRUD + pagination/search/sort/filter) ----------
 const R = {

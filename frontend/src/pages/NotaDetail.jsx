@@ -505,7 +505,7 @@ function SingleNotaSheet({
                 alt="stempel"
                 className="absolute max-h-[130px] max-w-[130px] print:max-h-[125px] print:max-w-[125px] object-contain opacity-90 pointer-events-none -rotate-6 z-10"
                 style={{
-                  left: nota.signature ? "30%" : "50%",
+                  left: nota.signature ? "40%" : "50%",
                   transform: "translateX(-50%) rotate(-6deg)",
                 }}
               />
