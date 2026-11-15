@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,7 +14,7 @@ const pageList = (p, t) => {
   return Array.from({ length: e - s + 1 }, (_, i) => s + i);
 };
 
-export default function DataTable({ columns, paged, actions }) {
+export default function DataTable({ columns, paged, actions, renderExpandedRow }) {
   const {
     rows,
     pagination: pg,
@@ -151,26 +151,34 @@ export default function DataTable({ columns, paged, actions }) {
                 {!loading &&
                   !error &&
                   rows.map((r, i) => (
-                    <tr
-                      key={r.id}
-                      className="group hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="py-3 px-3.5 text-center text-xs text-slate-400 font-medium whitespace-nowrap">
-                        {(pg.page - 1) * pg.limit + i + 1}
-                      </td>
-                      {columns.map((c) => (
-                        <td key={c.key} className="py-3 px-3.5 whitespace-nowrap">
-                          {c.render ? c.render(r) : r[c.key] ?? "-"}
+                    <Fragment key={r.id}>
+                      <tr
+                        className="group hover:bg-slate-50/80 transition-colors"
+                      >
+                        <td className="py-3 px-3.5 text-center text-xs text-slate-400 font-medium whitespace-nowrap">
+                          {(pg.page - 1) * pg.limit + i + 1}
                         </td>
-                      ))}
-                      {actions && (
-                        <td className="py-3 px-3.5 text-right sticky right-0 z-10 bg-white group-hover:bg-slate-50 transition-colors shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {actions(r)}
-                          </div>
-                        </td>
+                        {columns.map((c) => (
+                          <td key={c.key} className="py-3 px-3.5 whitespace-nowrap">
+                            {c.render ? c.render(r) : r[c.key] ?? "-"}
+                          </td>
+                        ))}
+                        {actions && (
+                          <td className="py-3 px-3.5 text-right sticky right-0 z-10 bg-white group-hover:bg-slate-50 transition-colors shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {actions(r)}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                      {renderExpandedRow && renderExpandedRow(r) && (
+                        <tr className="bg-slate-50/60 border-t border-b border-slate-200/80">
+                          <td colSpan={columns.length + (actions ? 2 : 1)} className="p-0">
+                            {renderExpandedRow(r)}
+                          </td>
+                        </tr>
                       )}
-                    </tr>
+                    </Fragment>
                   ))}
               </tbody>
             </table>
@@ -236,6 +244,13 @@ export default function DataTable({ columns, paged, actions }) {
                       </div>
                     ))}
                   </div>
+
+                  {/* Expanded Row Content in Card */}
+                  {renderExpandedRow && renderExpandedRow(r) && (
+                    <div className="pt-2 border-t border-slate-200/60">
+                      {renderExpandedRow(r)}
+                    </div>
+                  )}
 
                   {/* Actions Footer */}
                   {actions && (

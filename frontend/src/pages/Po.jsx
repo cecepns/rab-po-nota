@@ -101,7 +101,7 @@ export default function Po() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   // State View Detail Items PO
-  const [expandedPoId, setExpandedPoId] = useState(null);
+  const [expandedPoIds, setExpandedPoIds] = useState({});
   const [poItemsMap, setPoItemsMap] = useState({});
   const [loadingItemsId, setLoadingItemsId] = useState(null);
 
@@ -270,12 +270,13 @@ export default function Po() {
 
   // Expand / Collapse Items di PO
   const toggleExpand = async (poId) => {
-    if (expandedPoId === poId) {
-      setExpandedPoId(null);
-      return;
-    }
-    setExpandedPoId(poId);
-    if (!poItemsMap[poId]) {
+    const isExpanded = !!expandedPoIds[poId];
+    setExpandedPoIds((prev) => ({
+      ...prev,
+      [poId]: !isExpanded,
+    }));
+
+    if (!isExpanded && !poItemsMap[poId]) {
       setLoadingItemsId(poId);
       try {
         const res = await api.get(E.PO.ITEMS(poId));
@@ -287,6 +288,144 @@ export default function Po() {
         setLoadingItemsId(null);
       }
     }
+  };
+
+  // Render Rincian Bahan & Catatan PO Langsung di Bawah Baris Tabel (Inline Sub-row)
+  const renderInlineExpandedRow = (r) => {
+    if (!expandedPoIds[r.id]) return null;
+
+    const items = poItemsMap[r.id] || [];
+    const isLoading = loadingItemsId === r.id;
+
+    return (
+      <div className="p-4 sm:p-5 bg-slate-50/70 border-l-4 border-l-teal-600 space-y-3.5">
+        {/* Baris Ringkasan Catatan PO & Info Transaksi */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Kotak Catatan PO */}
+          <div className="md:col-span-2 rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
+            <FileText size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <div className="font-bold text-[11px] uppercase tracking-wider text-amber-800 flex items-center justify-between">
+                <span>Catatan PO</span>
+                <span className="text-[10px] font-normal text-amber-700">Ref: {r.po_no}</span>
+              </div>
+              <p className="text-xs text-amber-950 font-medium whitespace-pre-wrap leading-relaxed">
+                {r.notes && r.notes.trim() ? (
+                  r.notes
+                ) : (
+                  <span className="text-amber-700/60 italic">Tidak ada catatan</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Kotak Info Pembayaran & Supplier */}
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Sumber Bayar:</span>
+              <span className="font-bold text-slate-800 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
+                <CreditCard size={12} className="text-slate-500" />
+                {r.payment_method || "Transfer Bank (VA)"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Supplier:</span>
+              <span className="font-bold text-slate-900 uppercase text-[11px]">{r.supplier_name}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <span className="text-slate-500">Total PO:</span>
+              <span className="font-extrabold text-teal-800 text-sm">{rupiah(r.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabel Bahan / Item PO */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-0.5">
+            <span className="flex items-center gap-1.5">
+              <Package size={14} className="text-teal-600" />
+              <span>Daftar Bahan / Rincian Belanja PO:</span>
+            </span>
+            {items.length > 0 && (
+              <span className="text-[11px] text-slate-500 font-normal">
+                {items.length} item bahan
+              </span>
+            )}
+          </div>
+
+          {isLoading ? (
+            <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+              <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-teal-600 border-r-transparent mr-2 align-middle" />
+              Memuat rincian bahan...
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-4 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+              Tidak ada rincian bahan untuk PO ini
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+              <table className="w-full text-xs text-slate-800 min-w-[550px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">
+                    <th className="py-2.5 px-3.5 text-center w-10">No</th>
+                    <th className="py-2.5 px-3.5">Nama Bahan</th>
+                    <th className="py-2.5 px-3.5">Kategori</th>
+                    <th className="py-2.5 px-3.5 text-center">Jumlah</th>
+                    <th className="py-2.5 px-3.5 text-right">Harga Satuan</th>
+                    <th className="py-2.5 px-3.5 text-right">Subtotal</th>
+                    <th className="py-2.5 px-3.5">Pelanggan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((it, idx) => (
+                    <tr key={it.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-2.5 px-3.5 text-center text-slate-400 font-medium">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3.5 font-bold text-slate-900">
+                        {it.item_name}
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                          {guessCategory(it.item_name)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3.5 text-center font-bold text-slate-800">
+                        {+it.qty} {it.unit || "kg"}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-right text-slate-600">
+                        {rupiah(it.price)}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-right font-bold text-slate-900">
+                        {rupiah(it.total)}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-slate-600">
+                        {it.customer_name ? (
+                          <span className="font-semibold text-slate-700">{it.customer_name}</span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t border-slate-200 bg-slate-50/70 font-bold text-slate-800">
+                  <tr>
+                    <td colSpan={5} className="py-2.5 px-3.5 text-right text-slate-600">
+                      Total ({items.length} item):
+                    </td>
+                    <td className="py-2.5 px-3.5 text-right font-extrabold text-teal-800">
+                      {rupiah(items.reduce((s, it) => s + (+it.total || 0), 0))}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Grand Total bahan yang di-import
@@ -316,32 +455,53 @@ export default function Po() {
       {/* Tabel PO */}
       <DataTable
         paged={paged}
+        renderExpandedRow={renderInlineExpandedRow}
         columns={[
           {
             key: "date",
             label: "Tanggal",
-            render: (r) => (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(r.id)}
-                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                  title="Lihat rincian bahan"
-                >
-                  {expandedPoId === r.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </button>
-                <span className="font-semibold text-slate-800">
-                  {r.date ? r.date.slice(0, 10) : "-"}
-                </span>
-              </div>
-            ),
+            render: (r) => {
+              const isExpanded = !!expandedPoIds[r.id];
+              return (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExpand(r.id);
+                    }}
+                    className={`p-1 rounded-md transition ${
+                      isExpanded
+                        ? "text-teal-700 bg-teal-50"
+                        : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    }`}
+                    title={isExpanded ? "Tutup rincian & catatan" : "Lihat rincian & catatan"}
+                  >
+                    {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                  <span
+                    onClick={() => toggleExpand(r.id)}
+                    className="font-semibold text-slate-800 cursor-pointer hover:text-teal-700"
+                    title="Klik untuk buka/tutup rincian & catatan"
+                  >
+                    {r.date ? r.date.slice(0, 10) : "-"}
+                  </span>
+                </div>
+              );
+            },
           },
           {
             key: "po_no",
             label: "No. PO",
             render: (r) => (
-              <div>
-                <span className="font-bold text-slate-900">{r.po_no}</span>
+              <div
+                onClick={() => toggleExpand(r.id)}
+                className="cursor-pointer group/pono"
+                title="Klik untuk buka/tutup rincian & catatan"
+              >
+                <span className="font-bold text-slate-900 group-hover/pono:text-teal-700 transition">
+                  {r.po_no}
+                </span>
                 {r.item_count ? (
                   <span className="block text-[11px] text-slate-500 font-medium">
                     {r.item_count} item bahan
@@ -460,64 +620,6 @@ export default function Po() {
           );
         }}
       />
-
-      {/* Rincian Bahan yang Di-expand di bawah tabel */}
-      {expandedPoId && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-2.5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Package size={15} className="text-teal-600" /> Rincian Bahan PO #{expandedPoId}:
-            </span>
-            <button
-              onClick={() => setExpandedPoId(null)}
-              className="text-xs text-slate-400 hover:text-slate-700"
-            >
-              Tutup Rincian &times;
-            </button>
-          </div>
-
-          {loadingItemsId === expandedPoId ? (
-            <div className="py-4 text-center text-xs text-slate-400">Memuat rincian bahan...</div>
-          ) : (poItemsMap[expandedPoId] || []).length === 0 ? (
-            <div className="py-3 text-center text-xs text-slate-400">Tidak ada rincian bahan</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-slate-800">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold text-left">
-                    <th className="py-2 px-3">No</th>
-                    <th className="py-2 px-3">Nama Bahan</th>
-                    <th className="py-2 px-3">Kategori</th>
-                    <th className="py-2 px-3 text-center">Jumlah</th>
-                    <th className="py-2 px-3 text-right">Harga</th>
-                    <th className="py-2 px-3 text-right">Subtotal</th>
-                    <th className="py-2 px-3">Pelanggan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {poItemsMap[expandedPoId].map((it, idx) => (
-                    <tr key={it.id || idx} className="hover:bg-slate-50/50">
-                      <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
-                      <td className="py-2 px-3 font-bold text-slate-900">{it.item_name}</td>
-                      <td className="py-2 px-3 text-slate-500">
-                        <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                          {guessCategory(it.item_name)}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-center font-bold">
-                        {+it.qty} {it.unit || "kg"}
-                      </td>
-                      <td className="py-2 px-3 text-right text-slate-600">{rupiah(it.price)}</td>
-                      <td className="py-2 px-3 text-right font-bold text-slate-900">{rupiah(it.total)}</td>
-                      <td className="py-2 px-3 text-slate-500">{it.customer_name || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Modal 1: Buat PO Langsung Import dari RAB (Sesuai Gambar 1, 2, 4) */}
       <Modal
