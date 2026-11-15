@@ -772,9 +772,21 @@ export default function NotaDetail() {
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          /* Sembunyikan elemen UI yang tidak perlu saat cetak */
-          [data-hot-toast], .toaster, [role="status"], aside, nav, header, .print-hidden {
+          /* Sembunyikan SEMUA elemen toast, fixed portal, backdrop, dan UI navigasi saat print */
+          [data-hot-toast],
+          .toaster,
+          [role="status"],
+          [aria-live="polite"],
+          div[style*="position: fixed"],
+          div[style*="pointer-events: none"],
+          aside,
+          nav,
+          header,
+          .print-hidden {
             display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            background: transparent !important;
           }
 
           /* Container pembungkus setiap lembar nota dipaksa pindah ke halaman baru */

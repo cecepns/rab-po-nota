@@ -73,7 +73,7 @@ export default function Layout() {
   const currentTitle = currentItem?.label || "Sistem RAB - PO - Nota";
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 print:bg-white print:text-black">
+    <div className="min-h-screen bg-slate-100/70 text-slate-800 print:bg-white print:text-black print:min-h-0 print:block">
       {/* Mobile Backdrop */}
       <div
         onClick={() => setOpen(false)}
@@ -171,7 +171,7 @@ export default function Layout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="lg:pl-72 print:pl-0 flex flex-col min-h-screen print:min-h-0 print:bg-white">
+      <div className="lg:pl-72 print:pl-0 flex flex-col min-h-screen print:min-h-0 print:bg-white print:block">
         {/* Top Navbar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 print:hidden shadow-xs">
           <div className="flex items-center gap-3">
@@ -189,7 +189,7 @@ export default function Layout() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0 print:m-0 print:bg-white">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 print:p-0 print:m-0 print:bg-white print:block">
           <Outlet />
         </main>
       </div>
