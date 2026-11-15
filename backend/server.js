@@ -920,26 +920,34 @@ app.use((e, req, res, next) => {
 
   // Pastikan kolom customer_id di notas tersedia & po_id bisa multi-nota per PO
   try {
-    const [notaCols] = await db.query(`
-      SELECT COLUMN_NAME FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas'
-    `);
-    const existingNotaCols = (notaCols || []).map((c) => c.COLUMN_NAME);
-    if (!existingNotaCols.includes('customer_id')) {
+    try {
       await db.query(`ALTER TABLE notas ADD COLUMN customer_id INT NULL AFTER supplier_id`);
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add customer_id to notas:', e.message);
     }
 
+    // Tambah indeks non-unique pada po_id agar FK tetap aman saat index unik di-drop
+    try {
+      await db.query(`ALTER TABLE notas ADD INDEX idx_notas_po_id (po_id)`);
+    } catch (_) {}
+
     // Hapus indeks UNIQUE standalone pada po_id jika ada agar bisa buat nota terpisah per pelanggan
-    const [indexes] = await db.query(`
-      SELECT INDEX_NAME, NON_UNIQUE FROM information_schema.STATISTICS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas' AND COLUMN_NAME = 'po_id' AND NON_UNIQUE = 0
-    `);
-    for (const idx of indexes) {
-      if (idx.INDEX_NAME && idx.INDEX_NAME !== 'PRIMARY') {
-        try {
-          await db.query(`ALTER TABLE notas DROP INDEX \`${idx.INDEX_NAME}\``);
-        } catch (_) {}
+    try {
+      const [indexes] = await db.query(`
+        SELECT INDEX_NAME, NON_UNIQUE FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notas' AND COLUMN_NAME = 'po_id' AND NON_UNIQUE = 0
+      `);
+      for (const idx of indexes) {
+        if (idx.INDEX_NAME && idx.INDEX_NAME !== 'PRIMARY' && idx.INDEX_NAME !== 'idx_notas_po_id') {
+          try {
+            await db.query(`ALTER TABLE notas DROP INDEX \`${idx.INDEX_NAME}\``);
+          } catch (_) {}
+        }
       }
+    } catch (_) {
+      try {
+        await db.query(`ALTER TABLE notas DROP INDEX \`po_id\``);
+      } catch (_) {}
     }
   } catch (err) {
     console.error('Migration notas warning:', err.message);
@@ -947,20 +955,20 @@ app.use((e, req, res, next) => {
 
   // Pastikan kolom status, payment_method, notes di tabel pos tersedia
   try {
-    const [posCols] = await db.query(`
-      SELECT COLUMN_NAME FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pos'
-    `);
-    const existingPosCols = (posCols || []).map((c) => c.COLUMN_NAME);
-
-    if (!existingPosCols.includes('status')) {
+    try {
       await db.query(`ALTER TABLE pos ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'unpaid' AFTER supplier_id`);
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add status to pos:', e.message);
     }
-    if (!existingPosCols.includes('payment_method')) {
+    try {
       await db.query(`ALTER TABLE pos ADD COLUMN payment_method VARCHAR(60) NULL AFTER status`);
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add payment_method to pos:', e.message);
     }
-    if (!existingPosCols.includes('notes')) {
+    try {
       await db.query(`ALTER TABLE pos ADD COLUMN notes TEXT NULL AFTER payment_method`);
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add notes to pos:', e.message);
     }
   } catch (err) {
     console.error('Migration pos warning:', err.message);

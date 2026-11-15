@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS pos (
   po_no VARCHAR(60) NOT NULL UNIQUE,
   date DATE NOT NULL,
   supplier_id INT NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'unpaid',
+  payment_method VARCHAR(60) NULL DEFAULT 'Transfer Bank (VA)',
+  notes TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 );
@@ -59,9 +62,12 @@ CREATE TABLE IF NOT EXISTS notas (
   nota_no VARCHAR(60) NOT NULL UNIQUE,
   date DATE NOT NULL,
   supplier_id INT NOT NULL,
-  po_id INT NOT NULL UNIQUE,
+  customer_id INT NULL,
+  po_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_po_id (po_id),
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
   FOREIGN KEY (po_id) REFERENCES pos(id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS nota_items (
