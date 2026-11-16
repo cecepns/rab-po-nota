@@ -40,8 +40,13 @@ const creatableSelectStyles = {
     },
     padding: "0px 2px",
     backgroundColor: "#ffffff",
-    fontSize: "0.875rem",
+    fontSize: "0.8125rem",
     minHeight: "38px",
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0px 6px",
+    flexWrap: "nowrap",
   }),
   menuPortal: (base) => ({ ...base, zIndex: 99999 }),
   menu: (base) => ({
@@ -59,20 +64,24 @@ const creatableSelectStyles = {
         ? "#f0fdfa"
         : "#ffffff",
     color: state.isSelected ? "#ffffff" : "#1e293b",
-    fontSize: "0.875rem",
+    fontSize: "0.8125rem",
     cursor: "pointer",
     padding: "8px 12px",
   }),
   placeholder: (base) => ({
     ...base,
     color: "#94a3b8",
-    fontSize: "0.875rem",
+    fontSize: "0.8125rem",
+    whiteSpace: "nowrap",
   }),
   singleValue: (base) => ({
     ...base,
     color: "#0f172a",
     fontWeight: 600,
-    fontSize: "0.875rem",
+    fontSize: "0.8125rem",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   }),
   multiValue: (base) => ({
     ...base,
@@ -307,7 +316,7 @@ export default function Rab() {
       {
         customer_id: "",
         item_name: "",
-        supplier_id: currSupp[0]?.id || "",
+        supplier_id: "",
         qty: 1,
         unit: "kg",
         price: 0,
@@ -316,7 +325,7 @@ export default function Rab() {
     setBatchOpen(true);
   };
 
-  // Tambah baris item baru di batch (otomatis mewarisi pelanggan & supplier baris sebelumnya)
+  // Tambah baris item baru di batch (otomatis mewarisi pelanggan & supplier baris sebelumnya jika ada)
   const addBatchRow = () => {
     const lastRow = batchItems[batchItems.length - 1];
     setBatchItems((prev) => [
@@ -324,7 +333,7 @@ export default function Rab() {
       {
         customer_id: lastRow?.customer_id || "",
         item_name: "",
-        supplier_id: lastRow?.supplier_id || suppliers[0]?.id || "",
+        supplier_id: lastRow?.supplier_id || "",
         qty: 1,
         unit: "kg",
         price: 0,
@@ -390,7 +399,7 @@ export default function Rab() {
               ? materialData.price
               : row.price,
           supplier_id:
-            defaultSuppId || row.supplier_id || suppliers[0]?.id || "",
+            defaultSuppId || row.supplier_id || "",
         };
       })
     );
@@ -1002,8 +1011,8 @@ export default function Rab() {
 
       {/* MODAL MULTI-ITEM INPUT RAB */}
       {batchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-6xl xl:max-w-7xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-[96vw] max-w-[96vw] xl:w-[95vw] xl:max-w-[95vw] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[94vh]">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
               <div className="flex items-center gap-3">
@@ -1264,20 +1273,20 @@ export default function Rab() {
 
                 {/* --- 2. TAMPILAN DESKTOP: TABEL MULTI-KOLOM (hidden md:block) --- */}
                 <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
-                  <table className="w-full text-left text-sm min-w-[1100px]">
+                  <table className="w-full text-left text-sm min-w-[1050px]">
                     <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                       <tr>
-                        <th className="py-3 px-3 w-12 text-center">No</th>
-                        <th className="py-3 px-3 min-w-[210px]">Pelanggan / SPPG *</th>
-                        <th className="py-3 px-3 min-w-[230px]">
+                        <th className="py-3 px-2 w-10 text-center">No</th>
+                        <th className="py-3 px-3 min-w-[220px] w-[24%]">Pelanggan / SPPG *</th>
+                        <th className="py-3 px-3 min-w-[260px] w-[28%]">
                           Uraian / Nama Bahan *
                         </th>
-                        <th className="py-3 px-3 min-w-[190px]">Supplier *</th>
-                        <th className="py-3 px-2 w-24 min-w-[90px] text-center">Satuan</th>
-                        <th className="py-3 px-2 w-28 min-w-[100px] text-right">Qty *</th>
-                        <th className="py-3 px-2 w-36 min-w-[140px] text-right">Harga (Rp) *</th>
-                        <th className="py-3 px-3 w-36 min-w-[130px] text-right">Jumlah</th>
-                        <th className="py-3 px-2 w-20 min-w-[80px] text-center"></th>
+                        <th className="py-3 px-3 min-w-[220px] w-[24%]">Supplier *</th>
+                        <th className="py-3 px-2 w-20 min-w-[75px] text-center">Satuan</th>
+                        <th className="py-3 px-2 w-24 min-w-[85px] text-right">Qty *</th>
+                        <th className="py-3 px-2 w-32 min-w-[120px] text-right">Harga (Rp) *</th>
+                        <th className="py-3 px-3 w-32 min-w-[120px] text-right">Jumlah</th>
+                        <th className="py-3 px-2 w-16 min-w-[65px] text-center"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1287,12 +1296,12 @@ export default function Rab() {
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="py-2.5 px-3 text-center text-xs text-slate-400 font-bold">
+                            <td className="py-2.5 px-2 text-center text-xs text-slate-400 font-bold w-10">
                               {idx + 1}
                             </td>
 
                             {/* Kolom 1: Pelanggan / SPPG */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-3 w-[24%]">
                               <AsyncSelect
                                 cacheOptions
                                 defaultOptions={customerOptions}
@@ -1338,7 +1347,7 @@ export default function Rab() {
                             </td>
 
                             {/* Kolom 2: Uraian dengan AsyncCreatableSelect */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-3 w-[28%]">
                               <AsyncCreatableSelect
                                 defaultOptions={materialOptions}
                                 loadOptions={loadMaterialOptions}
@@ -1364,7 +1373,7 @@ export default function Rab() {
                             </td>
 
                             {/* Kolom 3: Supplier dengan AsyncSelect */}
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-3 w-[24%]">
                               <AsyncSelect
                                 cacheOptions
                                 defaultOptions={supplierOptions}
@@ -1413,11 +1422,11 @@ export default function Rab() {
                             </td>
 
                             {/* Satuan */}
-                            <td className="py-2 px-2 w-24 min-w-[90px]">
+                            <td className="py-2 px-2 w-20 min-w-[75px]">
                               <input
                                 type="text"
                                 placeholder="kg"
-                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-center font-medium focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
+                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2 text-xs text-center font-medium focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                                 value={row.unit}
                                 onChange={(e) =>
                                   updateBatchRow(idx, "unit", e.target.value)
@@ -1426,13 +1435,13 @@ export default function Rab() {
                             </td>
 
                             {/* Qty */}
-                            <td className="py-2 px-2 w-28 min-w-[100px]">
+                            <td className="py-2 px-2 w-24 min-w-[85px]">
                               <input
                                 type="number"
                                 step="any"
                                 min="0.01"
                                 required
-                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
+                                className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2 text-xs font-semibold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/10 outline-none"
                                 value={row.qty}
                                 onChange={(e) =>
                                   updateBatchRow(idx, "qty", e.target.value)
@@ -1441,7 +1450,7 @@ export default function Rab() {
                             </td>
 
                             {/* Harga */}
-                            <td className="py-2 px-2 w-36 min-w-[140px]">
+                            <td className="py-2 px-2 w-32 min-w-[120px]">
                               <input
                                 type="number"
                                 step="any"
@@ -1456,12 +1465,12 @@ export default function Rab() {
                             </td>
 
                             {/* Jumlah */}
-                            <td className="py-2.5 px-3 w-36 min-w-[130px] text-right font-black text-slate-800 text-xs">
+                            <td className="py-2.5 px-3 w-32 min-w-[120px] text-right font-black text-slate-800 text-xs">
                               {rupiah(lineTotal)}
                             </td>
 
                             {/* Tombol Salin & Hapus Baris */}
-                            <td className="py-2 px-2 w-20 min-w-[80px] text-center">
+                            <td className="py-2 px-2 w-16 min-w-[65px] text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   type="button"
