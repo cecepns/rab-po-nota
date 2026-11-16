@@ -16,7 +16,7 @@ import { jsPDF } from "jspdf";
 import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
-import { fileUrl, rupiah } from "@/utils/format";
+import { fileUrl, rupiah, cleanItemName } from "@/utils/format";
 import toast from "react-hot-toast";
 
 // Preset tema warna nota asli berdasarkan bukti fisik toko / sembako / daging
@@ -326,7 +326,7 @@ function SingleNotaSheet({
                   className="py-1.5 px-3 font-bold text-slate-900 print:text-black border-r"
                   style={theme.borderGrid}
                 >
-                  {it.item_name}
+                  {cleanItemName(it.item_name)}
                 </td>
                 <td
                   className="py-1 px-2 text-center border-r"

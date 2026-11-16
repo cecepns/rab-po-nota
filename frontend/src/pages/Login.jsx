@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
   LogIn,
   User,
@@ -12,6 +12,8 @@ import {
   BarChart3,
   ShieldCheck,
   Sparkles,
+  ArrowLeft,
+  Globe,
 } from "lucide-react";
 import { api } from "@/utils/api";
 import { API_ENDPOINTS } from "@/utils/endpoints";
@@ -24,6 +26,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [remember, setRemember] = useState(true);
   const nav = useNavigate();
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      nav("/dashboard", { replace: true });
+    }
+  }, [nav]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -38,7 +46,7 @@ export default function Login() {
       if (res.data.user?.username) {
         localStorage.setItem("user", JSON.stringify(res.data.user));
       }
-      nav("/");
+      nav("/dashboard");
     }
   };
 
@@ -95,6 +103,14 @@ export default function Login() {
       {/* Sisi Kanan: Form Login */}
       <div className="flex flex-1 items-center justify-center p-6 sm:p-12 lg:w-1/2 xl:w-5/12">
         <div className="w-full max-w-md space-y-6">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-700 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Kembali ke Website Depan</span>
+          </Link>
+
           {/* Brand Logo di Form Panel */}
           <div className="flex justify-center lg:justify-start">
             <Logo size="lg" />

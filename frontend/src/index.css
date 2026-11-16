@@ -3,6 +3,18 @@
   --color-brand: #0f766e;
   --color-brand-dark: #115e59;
   --color-soft: #f8fafc;
+  --color-navy-800: #102a43;
+  --color-navy-900: #0a192f;
+  --color-navy-950: #061020;
+  --color-forest-50: #ecfdf5;
+  --color-forest-100: #d1fae5;
+  --color-forest-600: #059669;
+  --color-forest-700: #047857;
+  --color-forest-800: #065f46;
+  --color-forest-900: #064e3b;
+  --color-gold-400: #fbbf24;
+  --color-gold-500: #f59e0b;
+  --color-gold-600: #d97706;
 }
 
 body {

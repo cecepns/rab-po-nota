@@ -27,7 +27,7 @@ import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
 import { confirmToast } from "@/utils/confirm";
-import { rupiah, today } from "@/utils/format";
+import { rupiah, today, cleanItemName } from "@/utils/format";
 
 const creatableSelectStyles = {
   control: (base, state) => ({
@@ -156,11 +156,14 @@ export default function Rab() {
     try {
       const res = await api.get(E.MATERIALS.LIST, { params: { limit: 100 } });
       const items = res.data?.data || [];
-      const opts = items.map((m) => ({
-        value: m.name,
-        label: m.code ? `[${m.code}] ${m.name}` : m.name,
-        data: m,
-      }));
+      const opts = items.map((m) => {
+        const cleanName = cleanItemName(m.name);
+        return {
+          value: cleanName,
+          label: cleanName,
+          data: { ...m, name: cleanName },
+        };
+      });
       setMaterialOptions(opts);
       return opts;
     } catch {
@@ -200,11 +203,14 @@ export default function Rab() {
           });
           const items = res.data?.data || [];
           callback(
-            items.map((m) => ({
-              value: m.name,
-              label: m.code ? `[${m.code}] ${m.name}` : m.name,
-              data: m,
-            }))
+            items.map((m) => {
+              const cleanName = cleanItemName(m.name);
+              return {
+                value: cleanName,
+                label: cleanName,
+                data: { ...m, name: cleanName },
+              };
+            })
           );
         } catch {
           callback([]);
@@ -216,7 +222,7 @@ export default function Rab() {
 
   // Handler buat bahan baku baru langsung dari dropdown
   const handleCreateMaterial = (idx, inputValue) => {
-    const trimmed = (inputValue || "").trim();
+    const trimmed = cleanItemName(inputValue || "").trim();
     if (!trimmed) return;
     const newOpt = {
       value: trimmed,
@@ -387,12 +393,14 @@ export default function Rab() {
       });
     }
 
+    const selectedName = cleanItemName(materialData?.name || opt.value || opt.label || "");
+
     setBatchItems((prev) =>
       prev.map((row, i) => {
         if (i !== idx) return row;
         return {
           ...row,
-          item_name: opt.label || opt.value,
+          item_name: selectedName,
           unit: materialData?.unit || row.unit || "kg",
           price:
             materialData?.price != null && materialData.price > 0
@@ -427,7 +435,10 @@ export default function Rab() {
       () =>
         api.post(E.RAB.BATCH, {
           date: batchHeader.date,
-          items: batchItems,
+          items: batchItems.map((it) => ({
+            ...it,
+            item_name: cleanItemName(it.item_name),
+          })),
         }),
       `Berhasil menyimpan ${batchItems.length} item RAB!`
     );
@@ -446,7 +457,7 @@ export default function Rab() {
       date: row.date,
       customer_id: row.customer_id,
       supplier_id: row.supplier_id,
-      item_name: row.item_name,
+      item_name: cleanItemName(row.item_name),
       qty: row.qty,
       unit: row.unit || "",
       price: row.price,
@@ -457,7 +468,11 @@ export default function Rab() {
     e.preventDefault();
     setSavingEdit(true);
     const res = await request(
-      () => api.put(E.RAB.DETAIL(editModal.id), editForm),
+      () =>
+        api.put(E.RAB.DETAIL(editModal.id), {
+          ...editForm,
+          item_name: cleanItemName(editForm.item_name),
+        }),
       "Item RAB berhasil diperbarui"
     );
     setSavingEdit(false);
@@ -599,7 +614,7 @@ export default function Rab() {
                   <td class="center">${i + 1}</td>
                   <td class="center">${r.date || "-"}</td>
                   <td>${r.customer_name || "-"}</td>
-                  <td class="bold">${r.item_name || "-"}</td>
+                  <td class="bold">${cleanItemName(r.item_name) || "-"}</td>
                   <td>${r.supplier_name || "-"}</td>
                   <td class="center">${r.unit || "-"}</td>
                   <td class="num">${r.qty || 0}</td>
@@ -751,7 +766,7 @@ export default function Rab() {
                   <td class="text-center">${i + 1}</td>
                   <td class="text-center">${r.date || "-"}</td>
                   <td>${r.customer_name || "-"}</td>
-                  <td class="font-bold">${r.item_name || "-"}</td>
+                  <td class="font-bold">${cleanItemName(r.item_name) || "-"}</td>
                   <td>${r.supplier_name || "-"}</td>
                   <td class="text-center">${r.unit || "-"}</td>
                   <td class="text-right font-bold">${+r.qty}</td>
@@ -954,7 +969,7 @@ export default function Rab() {
             key: "item_name",
             label: "Bahan Baku",
             render: (r) => (
-              <span className="font-bold text-slate-900">{r.item_name}</span>
+              <span className="font-bold text-slate-900">{cleanItemName(r.item_name)}</span>
             ),
           },
           {
@@ -1011,8 +1026,11 @@ export default function Rab() {
 
       {/* MODAL MULTI-ITEM INPUT RAB */}
       {batchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-[96vw] max-w-[96vw] xl:w-[95vw] xl:max-w-[95vw] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[94vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-3 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+          <div
+            style={{ width: "96vw", maxWidth: "96vw" }}
+            className="relative w-[96vw] max-w-[96vw] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[94vh]"
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
               <div className="flex items-center gap-3">
@@ -1162,7 +1180,7 @@ export default function Rab() {
                             loadOptions={loadMaterialOptions}
                             value={
                               row.item_name
-                                ? { value: row.item_name, label: row.item_name }
+                                ? { value: cleanItemName(row.item_name), label: cleanItemName(row.item_name) }
                                 : null
                             }
                             onChange={(opt) => handleMaterialSelect(idx, opt)}
@@ -1353,7 +1371,7 @@ export default function Rab() {
                                 loadOptions={loadMaterialOptions}
                                 value={
                                   row.item_name
-                                    ? { value: row.item_name, label: row.item_name }
+                                    ? { value: cleanItemName(row.item_name), label: cleanItemName(row.item_name) }
                                     : null
                                 }
                                 onChange={(opt) => handleMaterialSelect(idx, opt)}

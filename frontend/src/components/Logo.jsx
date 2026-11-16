@@ -1,3 +1,5 @@
+import logoImg from "@/assets/logo.png";
+
 export default function Logo({
   size = "md",
   showText = true,
@@ -6,23 +8,16 @@ export default function Logo({
   iconOnly = false,
 }) {
   const heightMap = {
+    xs: "h-7",
     sm: "h-9",
-    md: "h-12",
-    lg: "h-16",
-    xl: "h-24",
-  };
-
-  const textMap = {
-    sm: { title: "text-base", sub: "text-[10px]" },
-    md: { title: "text-lg", sub: "text-xs" },
-    lg: { title: "text-2xl", sub: "text-sm" },
-    xl: { title: "text-3xl", sub: "text-base" },
+    md: "h-11",
+    lg: "h-14",
+    xl: "h-20",
   };
 
   const h = heightMap[size] || heightMap.md;
-  const t = textMap[size] || textMap.md;
 
-  // Icon only
+  // Icon only (emblem)
   if (iconOnly) {
     return (
       <img
@@ -33,41 +28,29 @@ export default function Logo({
     );
   }
 
-  // Tampilan di latar gelap (misal: Sidebar gelap atau Hero banner login)
+  // Tampilan di latar gelap (misal: Sidebar gelap)
   if (light) {
     return (
-      <div className={`flex items-center gap-3 select-none ${className}`}>
-        <img
-          src="/logo-icon.png"
-          alt="Logo Ikatandi Group"
-          className={`${h} w-auto object-contain drop-shadow-md`}
-        />
-        {showText && (
-          <div className="flex flex-col leading-tight">
-            <span className={`font-black tracking-tight text-white ${t.title}`}>
-              IKATANDI<span className="text-teal-400"> GROUP</span>
-            </span>
-          </div>
-        )}
+      <div className={`inline-flex items-center select-none ${className}`}>
+        <div className="bg-white/95 rounded-xl px-2.5 py-1 shadow-xs border border-white/20">
+          <img
+            src={logoImg}
+            alt="Logo Ikatandi Group"
+            className={`${h} w-auto object-contain`}
+          />
+        </div>
       </div>
     );
   }
 
-  // Tampilan default di latar terang (menggunakan icon + teks Ikatandi Group)
+  // Tampilan default di latar terang
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
+    <div className={`inline-flex items-center select-none ${className}`}>
       <img
-        src="/logo-icon.png"
+        src={logoImg}
         alt="Logo Ikatandi Group"
         className={`${h} w-auto object-contain`}
       />
-      {showText && (
-        <div className="flex flex-col leading-tight">
-          <span className={`font-black tracking-tight text-slate-900 ${t.title}`}>
-            IKATANDI<span className="text-teal-600"> GROUP</span>
-          </span>
-        </div>
-      )}
     </div>
   );
 }

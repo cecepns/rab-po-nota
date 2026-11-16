@@ -4,6 +4,8 @@ USE rab_po_nota;
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
+  phone VARCHAR(30) NULL,
+  email VARCHAR(100) NULL,
   password VARCHAR(100) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -108,3 +110,16 @@ INSERT IGNORE INTO materials (name, unit, price, default_supplier_id) VALUES
  ('Beras putih (premium)', 'kg', 15400, 1),
  ('Wortel', 'kg', 19000, 2),
  ('Minyak goreng sawit', 'liter', 23000, 3);
+
+CREATE TABLE IF NOT EXISTS settings (
+  `key` VARCHAR(50) PRIMARY KEY,
+  `value` TEXT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO settings (`key`, `value`) VALUES
+  ('phone', '082312693414'),
+  ('email', 'mochamirudin17899@gmail.com'),
+  ('company_name', 'Ikatandi Group'),
+  ('address', 'Jl. Logistik Pangan No. 45, Kawasan Niaga Terpadu, Jakarta & Jaringan Cabang Regional, Indonesia')
+ON DUPLICATE KEY UPDATE `key`=`key`;

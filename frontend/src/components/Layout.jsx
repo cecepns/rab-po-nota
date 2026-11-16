@@ -15,6 +15,8 @@ import {
   UserCog,
   ChevronRight,
   Carrot,
+  Globe,
+  Settings,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 
@@ -22,8 +24,9 @@ const SECTIONS = [
   {
     title: "UTAMA",
     items: [
-      { to: "/", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/reports", label: "Laporan", icon: BarChart3 },
+      { to: "/", label: "Website Depan", icon: Globe, external: true },
     ],
   },
   {
@@ -35,12 +38,13 @@ const SECTIONS = [
     ],
   },
   {
-    title: "MASTER",
+    title: "MASTER & PENGATURAN",
     items: [
       { to: "/materials", label: "Bahan Baku", icon: Carrot },
       { to: "/suppliers", label: "Toko / Supplier", icon: Store },
       { to: "/customers", label: "Pelanggan", icon: Users },
       { to: "/users", label: "Pengguna", icon: UserCog },
+      { to: "/settings", label: "Pengaturan Website", icon: Settings },
     ],
   },
 ];
@@ -108,17 +112,40 @@ export default function Layout() {
                 {sec.title}
               </p>
               <div className="space-y-1">
-                {sec.items.map(({ to, label, icon: Icon }) => {
+                {sec.items.map(({ to, label, icon: Icon, external }) => {
                   const isActive =
-                    to === "/"
-                      ? location.pathname === "/"
-                      : location.pathname.startsWith(to);
+                    to === "/dashboard"
+                      ? location.pathname === "/dashboard"
+                      : to !== "/" && location.pathname.startsWith(to);
+
+                  if (external) {
+                    return (
+                      <a
+                        key={to}
+                        href={to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative flex items-center justify-between rounded-xl px-3.5 py-3 text-sm font-semibold transition-all duration-150 text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <Icon
+                            size={20}
+                            className="transition-transform duration-200 group-hover:scale-110 text-amber-400 group-hover:text-amber-300"
+                          />
+                          <span className="tracking-tight">{label}</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
+                          Buka
+                        </span>
+                      </a>
+                    );
+                  }
 
                   return (
                     <NavLink
                       key={to}
                       to={to}
-                      end={to === "/"}
+                      end={to === "/dashboard"}
                       onClick={() => setOpen(false)}
                       className={`group relative flex items-center justify-between rounded-xl px-3.5 py-3 text-sm font-semibold transition-all duration-150 ${
                         isActive

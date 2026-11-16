@@ -22,4 +22,6 @@ export const API_ENDPOINTS = {
     ITEM: (id) => `/nota-items/${id}`,
   },
   REPORT: { SUMMARY: "/report/summary" },
+  SETTINGS: "/settings",
+  PUBLIC: { CONTACT: "/public/contact" },
 };

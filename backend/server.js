@@ -271,15 +271,15 @@ app.get(
       ? +req.query.limit
       : 10;
     const search = clean(req.query.search) || '';
-    const where = search ? 'WHERE username LIKE ?' : '';
-    const args = search ? [`%${search}%`] : [];
+    const where = search ? 'WHERE username LIKE ? OR phone LIKE ? OR email LIKE ?' : '';
+    const args = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
 
     const [[{ total }]] = await db.query(
       `SELECT COUNT(*) total FROM users ${where}`,
       args,
     );
     const [rows] = await db.query(
-      `SELECT id, username, created_at FROM users ${where} ORDER BY id ASC LIMIT ? OFFSET ?`,
+      `SELECT id, username, phone, email, created_at FROM users ${where} ORDER BY id ASC LIMIT ? OFFSET ?`,
       [...args, limit, (page - 1) * limit],
     );
     ok(res, rows, {
@@ -297,6 +297,8 @@ app.post(
   wrap(async (req, res) => {
     const username = clean(req.body.username);
     const password = req.body.password;
+    const phone = clean(req.body.phone) || null;
+    const email = clean(req.body.email) || null;
     if (!username) throw fail(400, 'Username wajib diisi');
     if (!password || password.length < 4) {
       throw fail(400, 'Password minimal 4 karakter');
@@ -310,10 +312,10 @@ app.post(
 
     const hash = await bcrypt.hash(password, 10);
     const [r] = await db.query(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
-      [username, hash],
+      'INSERT INTO users (username, password, phone, email) VALUES (?, ?, ?, ?)',
+      [username, hash, phone, email],
     );
-    ok(res, { id: r.insertId, username });
+    ok(res, { id: r.insertId, username, phone, email });
   }),
 );
 
@@ -324,6 +326,8 @@ app.put(
     const id = +req.params.id;
     const username = clean(req.body.username);
     const password = req.body.password;
+    const phone = clean(req.body.phone) || null;
+    const email = clean(req.body.email) || null;
     if (!username) throw fail(400, 'Username wajib diisi');
 
     const [[existing]] = await db.query(
@@ -336,13 +340,71 @@ app.put(
       if (password.length < 4) throw fail(400, 'Password minimal 4 karakter');
       const hash = await bcrypt.hash(password, 10);
       await db.query(
-        'UPDATE users SET username=?, password=? WHERE id=?',
-        [username, hash, id],
+        'UPDATE users SET username=?, password=?, phone=?, email=? WHERE id=?',
+        [username, hash, phone, email, id],
       );
     } else {
-      await db.query('UPDATE users SET username=? WHERE id=?', [username, id]);
+      await db.query(
+        'UPDATE users SET username=?, phone=?, email=? WHERE id=?',
+        [username, phone, email, id],
+      );
     }
     ok(res, true);
+  }),
+);
+
+// ---------- Settings Management (Pengaturan Kontak & Profil Website) ----------
+app.get(
+  '/api/settings',
+  auth,
+  wrap(async (req, res) => {
+    const [rows] = await db.query('SELECT `key`, `value` FROM settings');
+    const settings = {
+      phone: '082312693414',
+      email: 'mochamirudin17899@gmail.com',
+      company_name: 'Ikatandi Group',
+      address: 'Jl. Logistik Pangan No. 45, Kawasan Niaga Terpadu, Jakarta & Jaringan Cabang Regional, Indonesia',
+    };
+    for (const r of rows) {
+      if (r.value !== null) settings[r.key] = r.value;
+    }
+    ok(res, settings);
+  }),
+);
+
+app.put(
+  '/api/settings',
+  auth,
+  wrap(async (req, res) => {
+    const allowed = ['phone', 'email', 'company_name', 'address'];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) {
+        const val = clean(req.body[k]) || '';
+        await db.query(
+          'INSERT INTO settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',
+          [k, val],
+        );
+      }
+    }
+    ok(res, true);
+  }),
+);
+
+// ---------- Kontak Publik untuk Website Depan (Landing Page) ----------
+app.get(
+  '/api/public/contact',
+  wrap(async (req, res) => {
+    const [rows] = await db.query('SELECT `key`, `value` FROM settings');
+    const settings = {
+      phone: '082312693414',
+      email: 'mochamirudin17899@gmail.com',
+      company_name: 'Ikatandi Group',
+      address: 'Jl. Logistik Pangan No. 45, Kawasan Niaga Terpadu, Jakarta & Jaringan Cabang Regional, Indonesia',
+    };
+    for (const r of rows) {
+      if (r.value) settings[r.key] = r.value;
+    }
+    ok(res, settings);
   }),
 );
 
@@ -394,7 +456,7 @@ app.post(
       let totalInserted = 0;
 
       for (const it of items) {
-        const item_name = clean(it.item_name);
+        const item_name = clean(it.item_name).replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
         const supplier_id = +it.supplier_id;
         const qty = +it.qty;
         const unit = clean(it.unit) || '';
@@ -827,6 +889,9 @@ app.post(
   wrap(async (req, res) => {
     if (req.c.readOnly) throw fail(405, 'Gunakan endpoint generate');
     const o = values(req.c, req);
+    if (req.params.r === 'rab' && o.item_name) {
+      o.item_name = o.item_name.replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
+    }
     validate(req.c, o);
     const [r] = await db.query(`INSERT INTO ${req.c.table} SET ?`, [o]);
 
@@ -855,6 +920,9 @@ app.put(
   wrap(async (req, res) => {
     if (req.c.readOnly) throw fail(405, 'Tidak diizinkan');
     const o = values(req.c, req);
+    if (req.params.r === 'rab' && o.item_name) {
+      o.item_name = o.item_name.replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
+    }
     validate(req.c, o, true);
     if (!Object.keys(o).length) throw fail(400, 'Tidak ada data diubah');
     await db.query(`UPDATE ${req.c.table} SET ? WHERE id=?`, [o, req.params.id]);
@@ -1017,12 +1085,80 @@ app.use((e, req, res, next) => {
     SELECT item_name, unit, price, supplier_id FROM rab_items ORDER BY id DESC
   `);
 
+  // Bersihkan prefix kode barang seperti [KH.01.001] dari rab_items, po_items, nota_items jika ada
+  try {
+    const [rabWithCode] = await db.query("SELECT id, item_name FROM rab_items WHERE item_name LIKE '[%'");
+    for (const r of rabWithCode) {
+      const cleanName = (r.item_name || '').replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
+      if (cleanName && cleanName !== r.item_name) {
+        await db.query("UPDATE rab_items SET item_name = ? WHERE id = ?", [cleanName, r.id]);
+      }
+    }
+    const [poWithCode] = await db.query("SELECT id, item_name FROM po_items WHERE item_name LIKE '[%'");
+    for (const p of poWithCode) {
+      const cleanName = (p.item_name || '').replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
+      if (cleanName && cleanName !== p.item_name) {
+        await db.query("UPDATE po_items SET item_name = ? WHERE id = ?", [cleanName, p.id]);
+      }
+    }
+    const [notaWithCode] = await db.query("SELECT id, item_name FROM nota_items WHERE item_name LIKE '[%'");
+    for (const n of notaWithCode) {
+      const cleanName = (n.item_name || '').replace(/^\[?[A-Z]{2,4}(?:\.\d{2,4})+\]?\s*[-–:]?\s*/i, '').trim();
+      if (cleanName && cleanName !== n.item_name) {
+        await db.query("UPDATE nota_items SET item_name = ? WHERE id = ?", [cleanName, n.id]);
+      }
+    }
+  } catch (err) {
+    console.warn("Pembersihan kode barang:", err.message);
+  }
+
+  // Pastikan kolom phone & email tersedia di tabel users
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN phone VARCHAR(30) NULL AFTER username`);
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add phone to users:', e.message);
+  }
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN email VARCHAR(100) NULL AFTER phone`);
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') console.warn('Add email to users:', e.message);
+  }
+
+  // Isi default kontak WhatsApp & Email jika belum ada
+  try {
+    await db.query(
+      `UPDATE users SET phone = COALESCE(phone, '082312693414'), email = COALESCE(email, 'mochamirudin17899@gmail.com') WHERE phone IS NULL OR email IS NULL`
+    );
+  } catch (e) {
+    console.warn('Update default contact users:', e.message);
+  }
+
+  // Pastikan tabel settings tersedia
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      \`key\` VARCHAR(50) PRIMARY KEY,
+      \`value\` TEXT NULL,
+      \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    INSERT INTO settings (\`key\`, \`value\`) VALUES
+      ('phone', '082312693414'),
+      ('email', 'mochamirudin17899@gmail.com'),
+      ('company_name', 'Ikatandi Group'),
+      ('address', 'Jl. Logistik Pangan No. 45, Kawasan Niaga Terpadu, Jakarta & Jaringan Cabang Regional, Indonesia')
+    ON DUPLICATE KEY UPDATE \`key\`=\`key\`
+  `);
+
   const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users');
   if (!n) {
     await db.query('INSERT INTO users SET ?', [
       {
         username: ADMIN_USER,
         password: await bcrypt.hash(ADMIN_PASS, 10),
+        phone: '082312693414',
+        email: 'mochamirudin17899@gmail.com',
       },
     ]);
   }

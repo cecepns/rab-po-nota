@@ -25,7 +25,7 @@ import { api } from "@/utils/api";
 import { API_ENDPOINTS as E } from "@/utils/endpoints";
 import { request } from "@/utils/request";
 import { confirmToast } from "@/utils/confirm";
-import { rupiah, today } from "@/utils/format";
+import { rupiah, today, cleanItemName } from "@/utils/format";
 import toast from "react-hot-toast";
 
 // Opsi Sumber Bayar standar
@@ -131,20 +131,23 @@ export default function Po() {
         setImportedItems([]);
       } else {
         // Format item agar siap di-edit dan disimpan
-        const formatted = items.map((it) => ({
-          id: it.id,
-          item_name: it.item_name,
-          category: guessCategory(it.item_name),
-          qty: +it.qty,
-          unit: it.unit || "kg",
-          price: +it.price,
-          subtotal: +it.qty * +it.price,
-          supplier_id: it.supplier_id || "",
-          supplier_name: it.supplier_name || "",
-          customer_name: it.customer_name || "",
-          received_qty: "",
-          invoice_price: "",
-        }));
+        const formatted = items.map((it) => {
+          const cleanedName = cleanItemName(it.item_name);
+          return {
+            id: it.id,
+            item_name: cleanedName,
+            category: guessCategory(cleanedName),
+            qty: +it.qty,
+            unit: it.unit || "kg",
+            price: +it.price,
+            subtotal: +it.qty * +it.price,
+            supplier_id: it.supplier_id || "",
+            supplier_name: it.supplier_name || "",
+            customer_name: it.customer_name || "",
+            received_qty: "",
+            invoice_price: "",
+          };
+        });
         setImportedItems(formatted);
         toast.success(`Berhasil menarik ${formatted.length} bahan dari RAB`);
       }
@@ -383,7 +386,7 @@ export default function Po() {
                         {idx + 1}
                       </td>
                       <td className="py-2.5 px-3.5 font-bold text-slate-900">
-                        {it.item_name}
+                        {cleanItemName(it.item_name)}
                       </td>
                       <td className="py-2.5 px-3.5">
                         <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">

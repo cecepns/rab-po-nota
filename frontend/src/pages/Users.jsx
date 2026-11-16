@@ -46,7 +46,10 @@ export default function Users() {
 
   const openEdit = (user) => {
     setEditing(user);
-    setForm({ username: user.username, password: "" });
+    setForm({
+      username: user.username,
+      password: "",
+    });
     setShowPassword(false);
     setOpen(true);
   };
@@ -95,11 +98,16 @@ export default function Users() {
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">
-          Pengguna
-        </h1>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+            Kelola Pengguna
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Kelola akun pengguna dan hak akses sistem Ikatandi Group.
+          </p>
+        </div>
 
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-xs font-bold">
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-xs font-bold shrink-0">
           <Plus size={16} /> Tambah Pengguna
         </button>
       </div>
@@ -110,7 +118,7 @@ export default function Users() {
         columns={[
           {
             key: "username",
-            label: "Username",
+            label: "Pengguna",
             render: (r) => {
               const isCurrent = r.username === currentUser.username;
               return (
@@ -118,13 +126,15 @@ export default function Users() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-800 font-bold text-xs uppercase">
                     {r.username.slice(0, 2)}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-slate-900">{r.username}</span>
-                    {isCurrent && (
-                      <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
-                        Anda
-                      </span>
-                    )}
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-900">{r.username}</span>
+                      {isCurrent && (
+                        <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
+                          Anda
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -199,7 +209,7 @@ export default function Users() {
               <input
                 type="text"
                 required
-                placeholder="Masukkan username baru"
+                placeholder="Masukkan username"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 className="input !pl-10"
